@@ -8,6 +8,7 @@ import {
   Sparkles,
   Store,
 } from "lucide-react";
+import type { AiAnalysisResult } from "../utils/openai";
 
 type ScoreItem = {
   label: string;
@@ -979,6 +980,70 @@ function toText(
   return value;
 }
 
+function getFollowupQaItems(answers: Record<string, string | string[]>): QaItem[] {
+  const entries = Object.keys(answers)
+    .filter((key) => key.startsWith("followup_") && !key.startsWith("followup_question_"))
+    .map((key) => {
+      const num = Number(key.replace("followup_", ""));
+      const qKey = `followup_question_${num}`;
+      const question = toText(answers[qKey], `추가 질문 ${num}`);
+      const answer = toText(answers[key], "미응답");
+      return { num, question, answer };
+    })
+    .filter((item) => Number.isFinite(item.num))
+    .sort((a, b) => a.num - b.num);
+
+  return entries.map((item) => ({
+    question: item.question,
+    answer: item.answer,
+    score: 70,
+  }));
+}
+
+function buildAiDataFromResult(
+  aiResult: AiAnalysisResult | null,
+  fallback: AiData,
+): AiData {
+  if (!aiResult) return fallback;
+
+  const summary =
+    aiResult.sbizAnalysis?.summary?.trim() ||
+    aiResult.insufficiencyReason?.trim() ||
+    fallback.summary;
+
+  const actionFromPlan =
+    aiResult.actionPlan?.flatMap((plan) => plan.tasks ?? []).filter(Boolean) ?? [];
+  const actionFromRisk =
+    aiResult.riskFactors?.map((risk) => risk.mitigation).filter(Boolean) ?? [];
+  const actions = [...actionFromPlan, ...actionFromRisk].slice(0, 4);
+
+  const detailed =
+    [
+      aiResult.sbizAnalysis?.competitionLevel,
+      aiResult.rentEstimation?.basis,
+      aiResult.interiorPlan?.styleDesc,
+    ]
+      .filter((text) => !!text && String(text).trim().length > 0)
+      .join("\n\n") || fallback.detailed;
+
+  return {
+    summary,
+    actions: actions.length > 0 ? actions : fallback.actions,
+    detailed,
+  };
+}
+
+function getFollowupEntries(answers: Record<string, string | string[]>) {
+  return Object.entries(answers)
+    .filter(([key, value]) => key.startsWith("followup_") && typeof value === "string")
+    .sort((a, b) => {
+      const aNum = Number(a[0].replace("followup_", ""));
+      const bNum = Number(b[0].replace("followup_", ""));
+      return aNum - bNum;
+    })
+    .map(([key, value]) => ({ key, value: String(value || "") }));
+}
+
 function getVisitorPersona(customerPool: string, repeat: string): string {
   const cp = customerPool || "";
   const rp = repeat || "";
@@ -1236,11 +1301,13 @@ function getDeepExecutionNotes(label: string, metrics: PosMetrics) {
 
 export function ExistingResultReport({
   answers,
+  aiResult,
   onReset,
   onGoMain,
   selectedCategories = [],
 }: {
   answers: Record<string, string | string[]>;
+  aiResult: AiAnalysisResult | null;
   onReset: () => void;
   onGoMain: () => void;
   selectedCategories?: string[];
@@ -1257,6 +1324,7 @@ export function ExistingResultReport({
     text: "",
   });
   const [isAiLoading, setIsAiLoading] = useState(true);
+  const followupEntries = getFollowupEntries(answers);
   const analysisMode = ((answers.analysisMode as string) ||
     "light") as AnalysisMode;
   const posMetrics = useMemo<PosMetrics>(
@@ -1375,6 +1443,11 @@ export function ExistingResultReport({
       ),
     [challenge, storeSize, operationScore, analysisMode, posMetrics],
   );
+  const followupQaItems = useMemo(() => getFollowupQaItems(answers), [answers]);
+  const resolvedAiData = useMemo(
+    () => buildAiDataFromResult(aiResult, aiData),
+    [aiResult, aiData],
+  );
 
   const categoryPages = useMemo(
     () =>
@@ -1386,11 +1459,14 @@ export function ExistingResultReport({
           stat.value,
           getCategoryAverageScore(stat.label),
         ),
-        qaItems: getCategoryQa(stat.label, answers),
+        qaItems:
+          followupQaItems.length > 0
+            ? followupQaItems
+            : getCategoryQa(stat.label, answers),
         solutions: getCategorySolutions(stat.label, stat.value, answers),
         supports: getCategorySupportItems(stat.label, region, bizType),
       })),
-    [detailStats, region, bizType, answers],
+    [detailStats, region, bizType, answers, followupQaItems],
   );
 
   const currentInsight = useMemo(
@@ -1507,6 +1583,29 @@ export function ExistingResultReport({
               style={{ width: `${((stage + 1) / TOTAL_STAGES) * 100}%` }}
             />
           </div>
+        {followupEntries.length > 0 && (
+          <div
+            className="mt-5 rounded-2xl p-5"
+            style={{
+              background: "rgba(255,255,255,0.04)",
+              border: "1px solid rgba(255,255,255,0.1)",
+            }}
+          >
+            <p style={{ fontSize: "0.9rem", fontWeight: 700, marginBottom: "10px" }}>
+              AI 추가 질문 응답 반영 내역
+            </p>
+            <div className="space-y-2">
+              {followupEntries.map((item, idx) => (
+                <div key={item.key} style={{ fontSize: "0.82rem", color: "rgba(255,255,255,0.72)" }}>
+                  <span style={{ color: "#34d399", fontWeight: 700, marginRight: "6px" }}>
+                    Q{idx + 1}
+                  </span>
+                  {item.value}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
           {stage > 0 && (
             <div
               className="mt-6 flex items-center gap-2 overflow-x-auto pb-2"
@@ -1851,9 +1950,9 @@ export function ExistingResultReport({
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   <div className="rounded-xl border border-white/10 bg-white/5 p-5">
                     <h3 className="font-bold text-lg mb-3">종합 진단</h3>
-                    <p className="text-zinc-300 leading-7">{aiData.summary}</p>
+                    <p className="text-zinc-300 leading-7">{resolvedAiData.summary}</p>
                     <ul className="mt-4 space-y-2">
-                      {aiData.actions.map((action) => (
+                      {resolvedAiData.actions.map((action) => (
                         <li
                           key={action}
                           className="flex items-start gap-2 text-sm text-zinc-200"
@@ -1865,7 +1964,7 @@ export function ExistingResultReport({
                     </ul>
                   </div>
                   <div className="rounded-xl border border-white/10 bg-white/5 p-5 text-zinc-300 leading-7 min-h-[220px]">
-                    <TypewriterText text={aiData.detailed} speed={24} />
+                    <TypewriterText text={resolvedAiData.detailed} speed={24} />
                   </div>
                 </div>
               )}

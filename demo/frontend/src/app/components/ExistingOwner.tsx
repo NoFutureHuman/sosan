@@ -289,6 +289,7 @@ type ExistingOwnerFlowViewsProps = {
   setCsvError: React.Dispatch<React.SetStateAction<string>>;
   handlePosCsvUpload: (file: File) => void;
   validatePosMetrics: (metrics: Record<string, string>) => string | null;
+  onQuestionsComplete?: (mode: "light" | "deep") => void;
 };
 
 export function ExistingOwnerFlowViews(props: ExistingOwnerFlowViewsProps) {
@@ -328,6 +329,7 @@ export function ExistingOwnerFlowViews(props: ExistingOwnerFlowViewsProps) {
     setCsvError,
     handlePosCsvUpload,
     validatePosMetrics,
+    onQuestionsComplete,
   } = props;
 
   if (flow === "existingNotice") return (
@@ -560,6 +562,10 @@ export function ExistingOwnerFlowViews(props: ExistingOwnerFlowViewsProps) {
     };
     const goNext = () => {
       if (isLast) {
+        if (onQuestionsComplete) {
+          onQuestionsComplete(isDeep ? "deep" : "light");
+          return;
+        }
         setFlow("loading");
         return;
       }

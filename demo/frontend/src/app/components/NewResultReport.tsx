@@ -92,6 +92,17 @@ function ReportFooter() {
 const RISK_COLOR: Record<string, string> = { "높음": "#ef4444", "중간": "#f59e0b", "낮음": "#10b981" };
 const RISK_BG: Record<string, string>    = { "높음": "rgba(239,68,68,0.1)", "중간": "rgba(245,158,11,0.1)", "낮음": "rgba(16,185,129,0.1)" };
 
+function getFollowupEntries(answers: Record<string, string | string[]>) {
+  return Object.entries(answers)
+    .filter(([key, value]) => key.startsWith("followup_") && typeof value === "string")
+    .sort((a, b) => {
+      const aNum = Number(a[0].replace("followup_", ""));
+      const bNum = Number(b[0].replace("followup_", ""));
+      return aNum - bNum;
+    })
+    .map(([key, value]) => ({ key, value: String(value || "") }));
+}
+
 /* ─────────────────────────────────────────
    신생 창업자 리포트 (메인 export)
 ───────────────────────────────────────── */
@@ -108,6 +119,7 @@ export function NewResultReport({
   onReset: () => void;
   onSwitchToExisting?: () => void;
 }) {
+  const followupEntries = getFollowupEntries(answers);
   return (
     <div style={{ background: "#141720", minHeight: "100vh", color: "white", padding: "32px 20px" }}>
       <div style={{ maxWidth: "1100px", margin: "0 auto" }}>
@@ -117,6 +129,29 @@ export function NewResultReport({
             style={{ background: "rgba(249,115,22,0.08)", border: "1px solid rgba(249,115,22,0.25)" }}>
             <AlertTriangle className="w-4 h-4 flex-shrink-0" style={{ color: "#f97316" }} />
             <p style={{ fontSize: "0.9rem", color: "rgba(255,255,255,0.6)" }}>AI 분석 중 오류가 발생했습니다. 기본 리포트를 표시합니다.</p>
+          </div>
+        )}
+        {followupEntries.length > 0 && (
+          <div
+            className="rounded-2xl p-5 mb-8"
+            style={{
+              background: "rgba(255,255,255,0.04)",
+              border: "1px solid rgba(255,255,255,0.1)",
+            }}
+          >
+            <p style={{ fontSize: "0.9rem", fontWeight: 700, marginBottom: "10px" }}>
+              AI 추가 질문 응답 반영 내역
+            </p>
+            <div className="space-y-2">
+              {followupEntries.map((item, idx) => (
+                <div key={item.key} style={{ fontSize: "0.82rem", color: "rgba(255,255,255,0.72)" }}>
+                  <span style={{ color: "#34d399", fontWeight: 700, marginRight: "6px" }}>
+                    Q{idx + 1}
+                  </span>
+                  {item.value}
+                </div>
+              ))}
+            </div>
           </div>
         )}
         <LocationAnalysisSection

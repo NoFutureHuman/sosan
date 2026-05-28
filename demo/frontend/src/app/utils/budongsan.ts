@@ -1,7 +1,9 @@
-const SERVICE_KEY    = import.meta.env.VITE_MOLIT_API_KEY    as string;
-const SBIZ_KEY       = import.meta.env.VITE_SBIZ_API_KEY     as string;
-const RONE_KEY       = import.meta.env.VITE_RONE_API_KEY     as string;
-const BIZINFO_KEY    = import.meta.env.VITE_BIZINFO_API_KEY  as string;
+const BACKEND_BASE_URL = "";
+
+function buildBackendUrl(path: string, params: Record<string, string>): string {
+  const search = new URLSearchParams(params);
+  return `${BACKEND_BASE_URL}${path}?${search.toString()}`;
+}
 
 /* ── 시도+시군구 조합 → 5자리 법정동 코드 ── */
 const SIGUNGU_CODE_MAP: Record<string, string> = {
@@ -134,86 +136,18 @@ export interface CommercialContext {
 export async function fetchCommercialContext(
   regionText: string
 ): Promise<CommercialContext | null> {
-  if (!SERVICE_KEY) return null;
-
   const sigunguCode = getSigunguCode(regionText);
   if (!sigunguCode) return null;
 
-  const now = new Date();
-  // 이번달, 지난달 순으로 시도
-  const ymds = [0, 1].map((offset) => {
-    const d = new Date(now.getFullYear(), now.getMonth() - offset, 1);
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    return `${y}${m}`;
-  });
-
-  for (const dealYMD of ymds) {
-    try {
-      const params = new URLSearchParams({
-        serviceKey: SERVICE_KEY,
-        LAWD_CD: sigunguCode,
-        DEAL_YMD: dealYMD,
-        numOfRows: "30",
-        pageNo: "1",
-      });
-
-      const res = await fetch(
-        `https://apis.data.go.kr/1613000/RTMSDataSvcNrgTrade/getRTMSDataSvcNrgTrade?${params}`
-      );
-      if (!res.ok) continue;
-
-      const text = await res.text();
-      const parser = new DOMParser();
-      const xml = parser.parseFromString(text, "text/xml");
-      const items = Array.from(xml.querySelectorAll("item"));
-      if (items.length === 0) continue;
-
-      const get = (item: Element, ...tags: string[]) => {
-        for (const tag of tags) {
-          const val = item.querySelector(tag)?.textContent?.trim();
-          if (val) return val;
-        }
-        return "-";
-      };
-
-      const trades = items.map((item) => ({
-        buildingName: get(item, "buildingName", "건물명"),
-        use: get(item, "buildingUse", "건물주용도"),
-        floor: get(item, "floor", "층"),
-        area: get(item, "buildingArea", "건물면적"),
-        amount: get(item, "dealAmount", "거래금액"),
-        dong: get(item, "umdNm", "법정동"),
-      }));
-
-      // 평당 평균 거래금액
-      let totalPerPyeong = 0, validCount = 0;
-      trades.forEach((t) => {
-        const amt = Number(t.amount.replace(/,/g, ""));
-        const area = Number(t.area);
-        if (amt > 0 && area > 0) {
-          totalPerPyeong += amt / (area / 3.3);
-          validCount++;
-        }
-      });
-
-      const y = dealYMD.slice(0, 4);
-      const m = String(parseInt(dealYMD.slice(4, 6)));
-
-      return {
-        sigunguCode,
-        regionName: regionText,
-        latestYearMonth: `${y}년 ${m}월`,
-        trades: trades.slice(0, 10),
-        avgAmountPerPyeong: validCount > 0 ? Math.round(totalPerPyeong / validCount) : 0,
-        sampleCount: trades.length,
-      };
-    } catch {
-      continue;
-    }
+  try {
+    const res = await fetch(
+      buildBackendUrl("/api/external/commercial", { regionText, sigunguCode }),
+    );
+    if (!res.ok) return null;
+    return (await res.json()) as CommercialContext;
+  } catch {
+    return null;
   }
-
-  return null;
 }
 
 /* ── 소상공인 상가정보 타입 ── */
@@ -248,101 +182,21 @@ export async function fetchSbizStores(
   regionText: string,
   bizCategory?: string  // 업종 (예: "카페", "식당")
 ): Promise<SbizStoreData | null> {
-  if (!SBIZ_KEY) return null;
-
-  const sigunguCode = getSigunguCode(regionText);
-  if (!sigunguCode) return null;
-
-  // 업종 대분류 코드 매핑 (음식 = Q)
-  const bizCodeMap: Record<string, string> = {
-    "식당": "Q09", "카페": "Q12", "디저트": "Q12",
-    "배달전문": "Q09", "주점": "Q09",
-  };
-  const indsLclsCd = bizCategory ? (bizCodeMap[bizCategory] ?? "Q09") : "Q09";
-
   try {
-    const params = new URLSearchParams({
-      serviceKey: SBIZ_KEY,
-      pageNo: "1",
-      numOfRows: "50",
-      divId: "signguCd",
-      key: sigunguCode,
-      indsLclsCd,
-    });
-
+    const sigunguCode = getSigunguCode(regionText);
+    if (!sigunguCode) return null;
     const res = await fetch(
-      `https://apis.data.go.kr/B553077/api/open/sdsc2/storeListInDong?${params}`
+      buildBackendUrl("/api/external/sbiz", {
+        regionText,
+        sigunguCode,
+        bizCategory: bizCategory ?? "",
+      }),
     );
     if (!res.ok) return null;
-
-    const text = await res.text();
-
-    // JSON 응답인 경우
-    if (text.trim().startsWith("{")) {
-      const json = JSON.parse(text);
-      const items: any[] = json?.body?.items?.item ?? [];
-      return parseStoreItems(items, regionText);
-    }
-
-    // XML 응답인 경우
-    const parser = new DOMParser();
-    const xml = parser.parseFromString(text, "text/xml");
-    const items = Array.from(xml.querySelectorAll("item")).map((el) => {
-      const get = (tag: string) => el.querySelector(tag)?.textContent?.trim() ?? "";
-      return {
-        bizesNm: get("bizesNm"),
-        rdnmAdr: get("rdnmAdr"),
-        lnoAdr: get("lnoAdr"),
-        bldNm: get("bldNm"),
-        flrNo: get("flrNo"),
-        indsSclsNm: get("indsSclsNm"),
-        indsMclsNm: get("indsMclsNm"),
-        adongNm: get("adongNm"),
-        lon: get("lon"),
-        lat: get("lat"),
-      };
-    });
-
-    return parseStoreItems(items, regionText);
+    return (await res.json()) as SbizStoreData;
   } catch {
     return null;
   }
-}
-
-function parseStoreItems(items: any[], regionName: string): SbizStoreData {
-  const stores: SbizStore[] = items.map((i: any) => ({
-    bizesNm:    i.bizesNm    ?? "",
-    rdnmAdr:    i.rdnmAdr    ?? "",
-    lnoAdr:     i.lnoAdr     ?? "",
-    bldNm:      i.bldNm      ?? "",
-    flrNo:      i.flrNo      ?? "-",
-    indsSclsNm: i.indsSclsNm ?? "",
-    indsMclsNm: i.indsMclsNm ?? "",
-    adongNm:    i.adongNm    ?? "",
-    lon:        String(i.lon ?? ""),
-    lat:        String(i.lat ?? ""),
-  }));
-
-  // 건물별 그룹핑
-  const bldMap = new Map<string, typeof stores>();
-  stores.forEach((s) => {
-    const key = s.bldNm || s.rdnmAdr;
-    if (!bldMap.has(key)) bldMap.set(key, []);
-    bldMap.get(key)!.push(s);
-  });
-
-  const buildingGroups = Array.from(bldMap.entries())
-    .map(([bldNm, list]) => ({
-      bldNm,
-      address: list[0].rdnmAdr || list[0].lnoAdr,
-      floors:  [...new Set(list.map((s) => s.flrNo).filter(Boolean))],
-      bizTypes:[...new Set(list.map((s) => s.indsSclsNm).filter(Boolean))],
-      count:   list.length,
-    }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 10);
-
-  return { regionName, totalCount: stores.length, stores, buildingGroups };
 }
 
 /* ── 실거래가 → 프롬프트 텍스트 ── */
@@ -375,116 +229,19 @@ export interface RoneRentContext {
   source: string;
 }
 
-/* R-ONE 시도명 매핑 */
-const SIDO_NAME_MAP: Record<string, string> = {
-  "서울": "서울", "부산": "부산", "대구": "대구", "인천": "인천",
-  "광주": "광주", "대전": "대전", "울산": "울산", "세종": "세종",
-  "경기": "경기", "강원": "강원", "충북": "충북", "충남": "충남",
-  "전북": "전북", "전남": "전남", "경북": "경북", "경남": "경남", "제주": "제주",
-};
-
-function extractSido(regionText: string): string {
-  const normalized = regionText
-    .replace("특별시", "").replace("광역시", "").replace("특별자치시", "")
-    .replace("특별자치도", "").replace(/도$/, "").trim();
-  const firstWord = normalized.split(/\s+/)[0];
-  return SIDO_NAME_MAP[firstWord] ?? "전국";
-}
-
-/* R-ONE SttsApiTblData 호출 헬퍼 */
-async function fetchRoneTable(statblId: string, period: string): Promise<any[] | null> {
-  const params = new URLSearchParams({
-    KEY: RONE_KEY,
-    STATBL_ID: statblId,
-    DTACYCLE_CD: "QY",
-    WRTTIME_IDTFR_ID: period,
-    Type: "json",
-    pIndex: "1",
-    pSize: "100",
-  });
-  try {
-    const res = await fetch(
-      `/proxy/r-one/openapi/SttsApiTblData.do?${params}`,
-      { signal: AbortSignal.timeout(8000) }
-    );
-    if (!res.ok) return null;
-    const json = await res.json();
-    // 응답 구조: { [STATBL_ID]: { row: [...] }, RESULT: { CODE, MESSAGE } }
-    const tableKey = Object.keys(json).find((k) => k !== "RESULT");
-    if (!tableKey) return null;
-    const rows: any[] = json[tableKey]?.row ?? [];
-    return rows.length > 0 ? rows : null;
-  } catch {
-    return null;
-  }
-}
 
 export async function fetchRoneRentData(
   regionText: string
 ): Promise<RoneRentContext | null> {
-  if (!RONE_KEY) return null;
-
-  const sido = extractSido(regionText);
-
-  // 최근 분기 순으로 시도 (현재 연도 기준으로 최대 4분기 앞까지)
-  const now = new Date();
-  const quarters: string[] = [];
-  for (let i = 0; i < 6; i++) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i * 3, 1);
-    const y = d.getFullYear();
-    const q = Math.ceil((d.getMonth() + 1) / 3);
-    quarters.push(`${y}${String(q).padStart(2, "0")}`);  // 예: "202403"
+  try {
+    const res = await fetch(
+      buildBackendUrl("/api/external/rone", { regionText }),
+    );
+    if (!res.ok) return null;
+    return (await res.json()) as RoneRentContext;
+  } catch {
+    return null;
   }
-
-  // R-ONE 통계표 ID 목록 (집합상가 / 소규모상가)
-  // ※ STATBL_ID는 R-ONE 포털(reb.or.kr/r-one/portal/openapi/openApiGuideCdPage.do)에서 확인 가능
-  const TABLE_IDS = [
-    { id: "A_2025_00150", type: "집합상가" },
-    { id: "A_2025_00151", type: "소규모상가" },
-    { id: "A_2024_00150", type: "집합상가" },
-    { id: "A_2024_00151", type: "소규모상가" },
-  ];
-
-  const results: RoneRentItem[] = [];
-  let successPeriod = "";
-
-  for (const period of quarters) {
-    for (const table of TABLE_IDS) {
-      const rows = await fetchRoneTable(table.id, period);
-      if (!rows) continue;
-
-      const filtered = rows.filter((r: any) => {
-        const regionVal: string = r.SIDO_NM ?? r.SIGNGU_NM ?? r.REGION_NM ?? r.AREA_NM ?? "";
-        return sido === "전국" || regionVal.includes(sido) || sido.includes(regionVal);
-      });
-
-      const targetRows = filtered.length > 0 ? filtered : rows.slice(0, 3);
-      targetRows.forEach((r: any) => {
-        results.push({
-          region: r.SIDO_NM ?? r.SIGNGU_NM ?? r.REGION_NM ?? r.AREA_NM ?? "전국",
-          type: table.type,
-          rentIndex: parseFloat(r.RENT_PRICE_IDX ?? r.RENT_IDX ?? r.IDX_VAL ?? "0") || 0,
-          vacancyRate: parseFloat(r.VACANCY_RATE ?? r.VCNCY_RATE ?? r.EMPTY_RATE ?? "0") || 0,
-          period,
-        });
-      });
-
-      if (results.length > 0) successPeriod = period;
-    }
-    if (results.length > 0) break;
-  }
-
-  if (results.length === 0) return null;
-
-  const y = successPeriod.slice(0, 4);
-  const q = parseInt(successPeriod.slice(4, 6));
-  const periodLabel = `${y}년 ${q}분기`;
-
-  return {
-    period: periodLabel,
-    items: results,
-    source: "한국부동산원 R-ONE 상업용부동산 임대동향조사",
-  };
 }
 
 /* ── 중소벤처24 정부 지원사업 공고 ── */
@@ -514,53 +271,16 @@ function getBizKeyword(bizType: string): string {
 }
 
 export async function fetchBizinfoSupport(
-  _bizType = "",
+  bizType = "",
 ): Promise<BizinfoContext | null> {
-  // bizinfo.go.kr는 포털에서 별도 키 신청 필요
-  // smes.go.kr는 서버 IP 차단으로 브라우저 직접 호출 불가
-  // 키 확보 후 아래 주석 해제하여 사용
-  return null;
+  try {
+    const res = await fetch(
+      buildBackendUrl("/api/external/bizinfo", { bizType }),
+    );
+    if (!res.ok) return null;
+    return (await res.json()) as BizinfoContext;
+  } catch {
+    return null;
+  }
 }
 
-function parseBizinfoItems(rawItems: any[], keyword: string, totalCount: number): BizinfoContext {
-  // 업종 키워드 관련 항목 우선 정렬, 나머지는 창업·소상공인 우선
-  const priority = (item: any) => {
-    const nm: string = (item.pblancNm ?? item.pblanc_nm ?? item.title ?? item.사업명 ?? "").toLowerCase();
-    const area: string = (item.excInsttNm ?? item.bsnsSopcBizAreaNm ?? item.bizAreaNm ?? "").toLowerCase();
-    const combined = nm + area;
-    if (combined.includes(keyword)) return 0;
-    if (combined.includes("소상공인") || combined.includes("창업")) return 1;
-    if (combined.includes("중소기업")) return 2;
-    return 3;
-  };
-
-  const sorted = [...rawItems].sort((a, b) => priority(a) - priority(b));
-
-  const items: BizinfoItem[] = sorted.slice(0, 6).map((r: any) => {
-    // smes.go.kr 응답 필드명 우선, 기존 bizinfo.go.kr 필드 폴백
-    const id   = r.pblancId ?? r.pblanc_id ?? r.id ?? "";
-    const name = r.pblancNm ?? r.pblanc_nm ?? r.title ?? r.사업명 ?? "지원사업";
-    const area = r.excInsttNm ?? r.bsnsSopcBizAreaNm ?? r.bizAreaNm ?? r.분야 ?? "";
-    const inst = r.jrsdInsttNm ?? r.mngtInstNm ?? r.institution ?? r.주관기관 ?? "";
-    const rcpt = r.rcptEndDe
-      ? `~ ${r.rcptEndDe}`
-      : r.reqstBeginEndDe ?? r.rcptBgnDe
-      ? `${r.rcptBgnDe ?? ""} ~ ${r.rcptEndDe ?? ""}`
-      : "";
-    const link = r.detailUrl ?? r.url
-      ?? `https://www.smes.go.kr/fnct/pblancInfo/selectPblancInfo?pblancId=${id}`;
-
-    return {
-      pblancId:    id,
-      pblancNm:    name,
-      bizAreaNm:   area,
-      supportType: r.sprtSe ?? r.bsnsSopcBizSpprtSe ?? "",
-      period:      rcpt,
-      institution: inst,
-      target:      r.sprtTrgt ?? r.sprtTrgtNm ?? "",
-      detailUrl:   link,
-    };
-  });
-
-  return { totalCount, items };
-}

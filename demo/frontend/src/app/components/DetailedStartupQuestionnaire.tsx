@@ -53,7 +53,7 @@ const QUESTIONS = [
   },
   {
     key: "storeSize",
-    category: "점포 규모/형태",
+    category: "점포 형태",
     question: "점포는 어떤 형태를 생각하고 계신가요?",
     options: ["무점포", "소형 매장", "중형 매장", "대형 매장", "아직 미정이에요"],
     multi: false,

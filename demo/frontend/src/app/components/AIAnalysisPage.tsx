@@ -21,6 +21,13 @@ import {
 } from "./ExistingOwner";
 import { ExistingOwnerMainPage } from "./ExistingOwnerMainPage";
 import { motion, AnimatePresence } from "framer-motion";
+import { analyzeStartup, type AiAnalysisResult } from "../utils/openai";
+import {
+  type BizinfoContext,
+  type CommercialContext,
+  type RoneRentContext,
+  type SbizStoreData,
+} from "../utils/budongsan";
 
 /* ─────────────────────────────────────────
    데이터 정의
@@ -92,6 +99,25 @@ const CURRENT_CHALLENGES = [
   "인건비/재료비 관리",
   "배달/플랫폼 수수료",
   "직원 관리 문제",
+  "경쟁 심화",
+];
+
+const OPERATION_PERIOD_OPTIONS = [
+  "6개월 미만",
+  "6개월~1년",
+  "1년~3년",
+  "3년~5년",
+  "5년 이상",
+];
+
+const SALES_TREND_OPTIONS = ["증가", "유지", "감소"];
+
+const OPERATION_BURDEN_OPTIONS = [
+  "인건비/재료비 부담",
+  "고객 유입·마케팅",
+  "임대료·고정비",
+  "배달 플랫폼 수수료",
+  "인력 관리",
   "경쟁 심화",
 ];
 
@@ -738,7 +764,15 @@ function AddressStep({
 /* ─────────────────────────────────────────
    로딩 화면
 ───────────────────────────────────────── */
-function LoadingScreen() {
+function LoadingScreen({
+  title = "AI가 최적의 솔루션을 분석 중입니다",
+  description = "입력하신 데이터를 기반으로 리포트를 생성하고 있어요",
+  errorMessage = "",
+}: {
+  title?: string;
+  description?: string;
+  errorMessage?: string;
+}) {
   const [dots, setDots] = useState(0);
 
   useEffect(() => {
@@ -774,7 +808,7 @@ function LoadingScreen() {
           marginBottom: "12px",
         }}
       >
-        AI가 최적의 솔루션을 분석 중입니다
+        {title}
       </h2>
       <div
         className="flex items-center gap-2"
@@ -787,9 +821,22 @@ function LoadingScreen() {
             borderTopColor: "#34d399",
           }}
         />
-        입력하신 데이터를 기반으로 리포트를 생성하고 있어요
+        {description}
         {"...".slice(0, dots)}
       </div>
+      {errorMessage && (
+        <div
+          className="mt-4 px-4 py-2 rounded-xl"
+          style={{
+            background: "rgba(239,68,68,0.12)",
+            border: "1px solid rgba(239,68,68,0.35)",
+            color: "#fca5a5",
+            fontSize: "0.85rem",
+          }}
+        >
+          {errorMessage}
+        </div>
+      )}
     </div>
   );
 }
@@ -810,6 +857,8 @@ type FlowState =
   | "deepQuestions"
   | "q0new"
   | "detailedNew"
+  | "newFollowupQuestions"
+  | "existingFollowupQuestions"
   | "q1"
   | "q2"
   | "q3"
@@ -848,11 +897,22 @@ type ChoiceFlowState = Exclude<
   | "deepQuestions"
   | "q0new"
   | "detailedNew"
+  | "newFollowupQuestions"
+  | "existingFollowupQuestions"
   | "q2ex"
   | "loading"
   | "result"
   | "ownerMain"
 >;
+
+type FollowupQuestion = {
+  question: string;
+  reason: string;
+  priority: "높음" | "중간" | "낮음";
+  options?: string[];
+};
+
+const MAX_FOLLOWUP_ROUNDS = 2;
 
 type ExistingQuestion = {
   question: string;
@@ -864,20 +924,32 @@ type ExistingQuestion = {
 
 const EXISTING_COMMON_QUESTIONS: ExistingQuestion[] = [
   {
-    type: "choice",
-    question: "운영 중이신 업종은 무엇인가요?",
-    options: BUSINESS_TYPES,
-    answerKey: "bizType",
-  },
-  {
     type: "address",
-    question: "현재 매장이 위치한 지역은 어디인가요?",
+    question: "운영중인 매장의 지역은 어디인가요?",
     answerKey: "region",
   },
   {
     type: "choice",
-    question: "가장 큰 경영 고민은 무엇인가요?",
-    options: CURRENT_CHALLENGES,
+    question: "운영 중인 업종은 무엇인가요?",
+    options: BUSINESS_TYPES,
+    answerKey: "bizType",
+  },
+  {
+    type: "choice",
+    question: "매장을 운영한 기간은 얼마나 되셨나요?",
+    options: OPERATION_PERIOD_OPTIONS,
+    answerKey: "operationPeriod",
+  },
+  {
+    type: "choice",
+    question: "최근 3개월간의 매출 추세는 어떤가요?",
+    options: SALES_TREND_OPTIONS,
+    answerKey: "revenueTrend",
+  },
+  {
+    type: "choice",
+    question: "현재 매장 운영에서 가장 부담되는 부분은 무엇인가요?",
+    options: OPERATION_BURDEN_OPTIONS,
     answerKey: "challenge",
   },
 ];
@@ -921,6 +993,33 @@ export function AIAnalysisPage() {
   const [posMetrics, setPosMetrics] = useState<PosMetrics>(INITIAL_POS_METRICS);
   const [posInputError, setPosInputError] = useState("");
   const [csvError, setCsvError] = useState("");
+  const [aiResult, setAiResult] = useState<AiAnalysisResult | null>(null);
+  const [aiError, setAiError] = useState(false);
+  const [sbizData, setSbizData] = useState<SbizStoreData | null>(null);
+  const [commercialCtx, setCommercialCtx] = useState<CommercialContext | null>(
+    null,
+  );
+  const [roneData, setRoneData] = useState<RoneRentContext | null>(null);
+  const [bizinfoData, setBizinfoData] = useState<BizinfoContext | null>(null);
+  const [followupQuestions, setFollowupQuestions] = useState<FollowupQuestion[]>(
+    [],
+  );
+  const [followupChoices, setFollowupChoices] = useState<Record<string, string>>(
+    {},
+  );
+  const [followupEtcInputs, setFollowupEtcInputs] = useState<
+    Record<string, string>
+  >({});
+  const [followupAnswers, setFollowupAnswers] = useState<Record<string, string>>(
+    {},
+  );
+  const [loadingPurpose, setLoadingPurpose] = useState<"followup" | "solution">(
+    "solution",
+  );
+  const [loadingErrorMessage, setLoadingErrorMessage] = useState("");
+  const [followupRound, setFollowupRound] = useState(0);
+  const [analysisReportId, setAnalysisReportId] = useState<number | null>(null);
+  const [isSubmittingFollowup, setIsSubmittingFollowup] = useState(false);
 
   const deepDataFields = useMemo(() => {
     const map = new Map<
@@ -980,11 +1079,11 @@ export function AIAnalysisPage() {
 
   /* 자동 로딩 → 결과 전환 */
   useEffect(() => {
-    if (flow === "loading") {
+    if (flow === "loading" && loadingPurpose === "solution") {
       const t = setTimeout(() => setFlow("result"), 2800);
       return () => clearTimeout(t);
     }
-  }, [flow]);
+  }, [flow, loadingPurpose]);
 
   const ans = (key: string): string => (answers[key] as string) || "";
   const set = (key: string, val: string) =>
@@ -1000,6 +1099,21 @@ export function AIAnalysisPage() {
     setPosMetrics(INITIAL_POS_METRICS);
     setPosInputError("");
     setCsvError("");
+    setAiResult(null);
+    setAiError(false);
+    setSbizData(null);
+    setCommercialCtx(null);
+    setRoneData(null);
+    setBizinfoData(null);
+    setFollowupQuestions([]);
+    setFollowupChoices({});
+    setFollowupEtcInputs({});
+    setFollowupAnswers({});
+    setLoadingPurpose("solution");
+    setLoadingErrorMessage("");
+    setFollowupRound(0);
+    setAnalysisReportId(null);
+    setIsSubmittingFollowup(false);
   };
   const startFlow = (type: "new" | "existing") => {
     resetAnswers();
@@ -1036,6 +1150,126 @@ export function AIAnalysisPage() {
       }
     }
     return null;
+  };
+
+  const runNewAnalysisPipeline = async (
+    inputAnswers: Record<string, string | string[]>,
+    inputFollowupAnswers?: Record<string, string>,
+  ) => {
+    const result = await analyzeStartup(
+      inputAnswers,
+      null,
+      null,
+      "new",
+      null,
+      null,
+      [],
+      analysisReportId,
+      inputFollowupAnswers,
+    );
+    setAnalysisReportId(result.reportId);
+    setAiResult(result);
+    return result;
+  };
+
+  const generateFollowupQuestions = async (
+    baseAnswers: Record<string, string | string[]>,
+  ) => {
+    setLoadingPurpose("followup");
+    setLoadingErrorMessage("");
+    setFlow("loading");
+    try {
+      setAiError(false);
+      const result = await runNewAnalysisPipeline(baseAnswers);
+      const nextQuestions = (result.solutionQuestions ?? []).slice(0, 6);
+      if (result.isAnswerSufficient || nextQuestions.length === 0) {
+        setLoadingPurpose("solution");
+        setLoadingErrorMessage("");
+        setFlow("loading");
+        return;
+      }
+      setFollowupQuestions(nextQuestions);
+      setFollowupChoices({});
+      setFollowupEtcInputs({});
+      setFollowupAnswers({});
+      setFollowupRound(1);
+      setFlow("newFollowupQuestions");
+    } catch (e: any) {
+      setAiError(true);
+      setLoadingErrorMessage(
+        e?.message === "AI_NOT_CONNECTED"
+          ? "AI 연결이 설정되어 있지 않습니다. OpenAI API 키를 확인해주세요."
+          : String(e?.message || "").startsWith("분석 파이프라인 오류:")
+            ? `분석 서버 오류: ${e.message}`
+          : "AI 추가 질문 생성 중 오류가 발생했습니다.",
+      );
+      setFlow("loading");
+    }
+  };
+
+  const runExistingAnalysisPipeline = async (
+    inputAnswers: Record<string, string | string[]>,
+    mode: "light" | "deep",
+    inputFollowupAnswers?: Record<string, string>,
+  ) => {
+    const selectedCategories =
+      mode === "deep" ? selectedDeepCategories : selectedExistingCategories;
+
+    const result = await analyzeStartup(
+      inputAnswers,
+      null,
+      null,
+      "existing",
+      null,
+      null,
+      selectedCategories,
+      analysisReportId,
+      inputFollowupAnswers,
+    );
+    setAnalysisReportId(result.reportId);
+    setAiResult(result);
+    return result;
+  };
+
+  const generateExistingFollowupQuestions = async (mode: "light" | "deep") => {
+    const selectedCategories =
+      mode === "deep" ? selectedDeepCategories : selectedExistingCategories;
+    setLoadingPurpose("followup");
+    setLoadingErrorMessage("");
+    setFlow("loading");
+
+    try {
+      setAiError(false);
+      const baseAnswers = {
+        ...answers,
+        selectedCategories,
+      };
+      setAnswers(baseAnswers);
+      const result = await runExistingAnalysisPipeline(baseAnswers, mode);
+      const nextQuestions = (result.solutionQuestions ?? []).slice(0, 6);
+      if (result.isAnswerSufficient || nextQuestions.length === 0) {
+        setLoadingPurpose("solution");
+        setLoadingErrorMessage("");
+        setFlow("loading");
+        return;
+      }
+      setFollowupQuestions(nextQuestions);
+      setFollowupChoices({});
+      setFollowupEtcInputs({});
+      setFollowupAnswers({});
+      setFollowupRound(1);
+      setFlow("existingFollowupQuestions");
+    } catch (e: any) {
+      setAiError(true);
+      setLoadingErrorMessage(
+        e?.message === "AI_NOT_CONNECTED"
+          ? "AI 연결이 설정되어 있지 않습니다. OpenAI API 키를 확인해주세요."
+          : String(e?.message || "").startsWith("분석 파이프라인 오류:")
+            ? `분석 서버 오류: ${e.message}`
+          : "AI 추가 질문 생성 중 오류가 발생했습니다.",
+      );
+      setFlow("loading");
+    }
   };
 
   const handlePosCsvUpload = (file: File) => {
@@ -1110,7 +1344,22 @@ export function AIAnalysisPage() {
   }
 
   /* ── 로딩 ── */
-  if (flow === "loading") return <LoadingScreen />;
+  if (flow === "loading")
+    return (
+      <LoadingScreen
+        title={
+          loadingPurpose === "followup"
+            ? "AI가 추가 질문을 생성중입니다"
+            : "AI가 최적의 솔루션을 분석 중입니다"
+        }
+        description={
+          loadingPurpose === "followup"
+            ? "고정 질문과 API 데이터를 기반으로 맞춤 추가 질문을 만들고 있어요"
+            : "입력하신 데이터를 기반으로 리포트를 생성하고 있어요"
+        }
+        errorMessage={loadingErrorMessage}
+      />
+    );
 
   /* ── 결과 ── */
   const handleReset = () => {
@@ -1133,6 +1382,7 @@ export function AIAnalysisPage() {
     return (
       <ExistingResultReport
         answers={answers}
+        aiResult={aiResult}
         onReset={handleExistingMain}
         onGoMain={() => setFlow("ownerMain")}
         selectedCategories={
@@ -1146,6 +1396,12 @@ export function AIAnalysisPage() {
     return (
       <NewResultReport
         answers={answers}
+        aiResult={aiResult}
+        aiError={aiError}
+        sbizData={sbizData}
+        commercialCtx={commercialCtx}
+        roneData={roneData}
+        bizinfoData={bizinfoData}
         onReset={handleReset}
         onSwitchToExisting={handleSwitchToExisting}
       />
@@ -1237,9 +1493,7 @@ export function AIAnalysisPage() {
             </div>
             <button
               disabled={!ans("hasPlan")}
-              onClick={() =>
-                setFlow(ans("hasPlan") === "예" ? "detailedNew" : "q1")
-              }
+              onClick={() => setFlow("detailedNew")}
               className="mt-8 w-full h-14 rounded-2xl font-bold text-white transition-all"
               style={{
                 background: ans("hasPlan")
@@ -1261,11 +1515,312 @@ export function AIAnalysisPage() {
       <DetailedStartupQuestionnaire
         onBack={() => setFlow("q0new")}
         onComplete={(detailedAnswers) => {
-          setAnswers((prev) => ({ ...prev, ...detailedAnswers }));
-          setFlow("loading");
+          const mergedAnswers = { ...answers, ...detailedAnswers };
+          setAnswers(mergedAnswers);
+          generateFollowupQuestions(mergedAnswers);
         }}
       />
     );
+
+  if (flow === "newFollowupQuestions" || flow === "existingFollowupQuestions") {
+    const isExistingFollowup = flow === "existingFollowupQuestions";
+    const allAnswered =
+      followupQuestions.length > 0 &&
+      followupQuestions.every(
+        (item, idx) => {
+          const key = `followup_${idx + 1}`;
+          const options = (item.options ?? []).filter(
+            (opt) => opt && opt.trim().length > 0,
+          );
+          if (options.length === 0) return false;
+          const choice = followupChoices[key];
+          if (!choice) return false;
+          if (choice !== "기타(직접입력)") return true;
+          return (followupEtcInputs[key] || "").trim().length > 0;
+        },
+      );
+
+    return (
+      <div style={PAGE_BG}>
+        <div style={{ maxWidth: 760, margin: "0 auto", padding: "32px 20px" }}>
+          <TopBar
+            onBack={() =>
+              setFlow(
+                isExistingFollowup
+                  ? analysisMode === "deep"
+                    ? "deepQuestions"
+                    : "existingQuestions"
+                  : "detailedNew",
+              )
+            }
+            label="추가 확인 질문"
+          />
+          <div
+            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-full mb-5"
+            style={{
+              background: "rgba(16,185,129,0.15)",
+              border: "1px solid rgba(16,185,129,0.35)",
+              fontSize: "0.8rem",
+              fontWeight: 600,
+              color: "#34d399",
+            }}
+          >
+            <Sparkles style={{ width: "14px", height: "14px" }} />
+            AI가 정밀 솔루션을 위해 생성한 추가 질문
+          </div>
+          <h2
+            style={{
+              fontSize: "clamp(1.4rem, 3.5vw, 2rem)",
+              fontWeight: 800,
+              letterSpacing: "-0.03em",
+              marginBottom: "10px",
+            }}
+          >
+            {isExistingFollowup
+              ? "선택 카테고리 기반 추가 확인이 필요합니다"
+              : "고정질문 기반 추가 확인이 필요합니다"}
+          </h2>
+          <p style={{ color: "rgba(255,255,255,0.45)", marginBottom: "20px" }}>
+            아래 질문은 고정질문 응답과 API 데이터 기반으로 생성되었습니다.
+          </p>
+          <div className="space-y-4 mb-8">
+            {followupQuestions.map((item, idx) => {
+              const key = `followup_${idx + 1}`;
+              const dynamicOptions = (item.options ?? []).filter(
+                (opt) => opt && opt.trim().length > 0,
+              );
+              const options = dynamicOptions;
+              return (
+                <div
+                  key={key}
+                  className="rounded-2xl p-4"
+                  style={{
+                    background: "rgba(255,255,255,0.04)",
+                    border: "1px solid rgba(255,255,255,0.1)",
+                  }}
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    <span
+                      style={{
+                        fontSize: "0.75rem",
+                        color: "#34d399",
+                        fontWeight: 700,
+                      }}
+                    >
+                      우선순위 {item.priority}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: "0.75rem",
+                        color: "rgba(255,255,255,0.35)",
+                      }}
+                    >
+                      {item.reason}
+                    </span>
+                  </div>
+                  <p style={{ fontWeight: 700, marginBottom: "10px" }}>
+                    Q{idx + 1}. {item.question}
+                  </p>
+                  {options.length === 0 ? (
+                    <div
+                      className="px-3 py-2 rounded-xl mb-3"
+                      style={{
+                        border: "1px solid rgba(239,68,68,0.35)",
+                        background: "rgba(239,68,68,0.12)",
+                        color: "#fca5a5",
+                        fontSize: "0.85rem",
+                      }}
+                    >
+                      AI 선택지가 누락되어 다시 생성이 필요합니다.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
+                      {options.map((option) => {
+                        const selected = followupChoices[key] === option;
+                        return (
+                          <button
+                            key={`${key}_${option}`}
+                            type="button"
+                            onClick={() =>
+                              setFollowupChoices((prev) => ({ ...prev, [key]: option }))
+                            }
+                            className="text-left px-3 py-2 rounded-xl transition-all"
+                            style={{
+                              border: selected
+                                ? "1.5px solid #10b981"
+                                : "1px solid rgba(255,255,255,0.12)",
+                              background: selected
+                                ? "rgba(16,185,129,0.14)"
+                                : "rgba(255,255,255,0.03)",
+                              color: selected
+                                ? "#34d399"
+                                : "rgba(255,255,255,0.75)",
+                              fontSize: "0.88rem",
+                              fontWeight: selected ? 700 : 500,
+                            }}
+                          >
+                            {option}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {followupChoices[key] === "기타(직접입력)" && (
+                    <textarea
+                      value={followupEtcInputs[key] ?? ""}
+                      onChange={(e) =>
+                        setFollowupEtcInputs((prev) => ({
+                          ...prev,
+                          [key]: e.target.value,
+                        }))
+                      }
+                      placeholder="기타 답변을 입력해주세요"
+                      style={{
+                        width: "100%",
+                        minHeight: "84px",
+                        borderRadius: "12px",
+                        padding: "10px 12px",
+                        border: "1px solid rgba(255,255,255,0.15)",
+                        background: "rgba(0,0,0,0.2)",
+                        color: "white",
+                        outline: "none",
+                      }}
+                    />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          <button
+            disabled={!allAnswered || isSubmittingFollowup}
+            onClick={async () => {
+              if (isSubmittingFollowup) return;
+              setIsSubmittingFollowup(true);
+              const resolvedFollowup = Object.fromEntries(
+                followupQuestions.map((_, idx) => {
+                  const key = `followup_${idx + 1}`;
+                  const choice = followupChoices[key] || "";
+                  if (choice === "기타(직접입력)") {
+                    const etc = (followupEtcInputs[key] || "").trim();
+                    return [key, `기타: ${etc}`];
+                  }
+                  return [key, choice.trim()];
+                }),
+              );
+              const followupQuestionMap = Object.fromEntries(
+                followupQuestions.map((item, idx) => [
+                  `followup_question_${idx + 1}`,
+                  item.question,
+                ]),
+              );
+              setFollowupAnswers(resolvedFollowup);
+              const merged = {
+                ...answers,
+                ...followupQuestionMap,
+                ...Object.fromEntries(
+                  Object.entries(resolvedFollowup).map(([k, v]) => [k, v.trim()]),
+                ),
+              };
+              const trimmedFollowup = Object.fromEntries(
+                Object.entries(resolvedFollowup).map(([k, v]) => [k, v.trim()]),
+              );
+              setAnswers(merged);
+              try {
+                setAiError(false);
+                setLoadingPurpose("followup");
+                setLoadingErrorMessage("");
+                if (isExistingFollowup) {
+                  const next = await runExistingAnalysisPipeline(
+                    merged,
+                    analysisMode,
+                    trimmedFollowup,
+                  );
+                  const nextQuestions = (next.solutionQuestions ?? []).slice(0, 6);
+                  const isSameQuestionSet =
+                    nextQuestions.map((q) => q.question.trim()).join("|") ===
+                    followupQuestions.map((q) => q.question.trim()).join("|");
+                  if (
+                    !next.isAnswerSufficient &&
+                    nextQuestions.length > 0 &&
+                    followupRound < MAX_FOLLOWUP_ROUNDS &&
+                    !isSameQuestionSet
+                  ) {
+                    setFollowupQuestions(nextQuestions);
+                    setFollowupChoices({});
+                    setFollowupEtcInputs({});
+                    setFollowupAnswers({});
+                    setFollowupRound((prev) => prev + 1);
+                    setIsSubmittingFollowup(false);
+                    setFlow("existingFollowupQuestions");
+                    return;
+                  }
+                } else {
+                  const next = await runNewAnalysisPipeline(
+                    merged,
+                    trimmedFollowup,
+                  );
+                  const nextQuestions = (next.solutionQuestions ?? []).slice(0, 6);
+                  const isSameQuestionSet =
+                    nextQuestions.map((q) => q.question.trim()).join("|") ===
+                    followupQuestions.map((q) => q.question.trim()).join("|");
+                  if (
+                    !next.isAnswerSufficient &&
+                    nextQuestions.length > 0 &&
+                    followupRound < MAX_FOLLOWUP_ROUNDS &&
+                    !isSameQuestionSet
+                  ) {
+                    setFollowupQuestions(nextQuestions);
+                    setFollowupChoices({});
+                    setFollowupEtcInputs({});
+                    setFollowupAnswers({});
+                    setFollowupRound((prev) => prev + 1);
+                    setIsSubmittingFollowup(false);
+                    setFlow("newFollowupQuestions");
+                    return;
+                  }
+                }
+                setLoadingPurpose("solution");
+              } catch (e: any) {
+                setAiError(true);
+                setLoadingErrorMessage(
+                  e?.message === "AI_NOT_CONNECTED"
+                    ? "AI 연결이 설정되어 있지 않습니다. OpenAI API 키를 확인해주세요."
+                    : String(e?.message || "").startsWith("분석 파이프라인 오류:")
+                      ? `분석 서버 오류: ${e.message}`
+                    : "AI 솔루션 생성 중 오류가 발생했습니다.",
+                );
+                setIsSubmittingFollowup(false);
+              }
+              setFlow("loading");
+            }}
+            className="w-full h-[56px] rounded-2xl transition-all active:scale-[0.99]"
+            style={{
+              background: allAnswered && !isSubmittingFollowup
+                ? "linear-gradient(135deg,#10b981,#34d399)"
+                : "rgba(255,255,255,0.06)",
+              color:
+                allAnswered && !isSubmittingFollowup
+                  ? "white"
+                  : "rgba(255,255,255,0.25)",
+              fontSize: "1.02rem",
+              fontWeight: 700,
+              border: "none",
+              cursor:
+                allAnswered && !isSubmittingFollowup ? "pointer" : "not-allowed",
+              boxShadow:
+                allAnswered && !isSubmittingFollowup
+                  ? "0 8px 28px rgba(16,185,129,0.4)"
+                  : "none",
+            }}
+          >
+            {isSubmittingFollowup
+              ? "처리 중입니다..."
+              : "추가 답변 반영해 솔루션 생성"}
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const existingOwnerFlowView = ExistingOwnerFlowViews({
     flow,
@@ -1303,6 +1858,7 @@ export function AIAnalysisPage() {
     setCsvError,
     handlePosCsvUpload,
     validatePosMetrics: validatePosMetrics as any,
+    onQuestionsComplete: generateExistingFollowupQuestions,
   });
   if (existingOwnerFlowView) return existingOwnerFlowView;
 

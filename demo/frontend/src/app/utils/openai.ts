@@ -1,8 +1,19 @@
-import { commercialContextToText, type CommercialContext, type SbizStoreData } from "./budongsan";
-
-const API_KEY = import.meta.env.VITE_OPENAI_API_KEY as string;
+import {
+  type BizinfoContext,
+  type CommercialContext,
+  type RoneRentContext,
+  type SbizStoreData,
+} from "./budongsan";
 
 export interface AiAnalysisResult {
+  isAnswerSufficient?: boolean;
+  insufficiencyReason?: string;
+  solutionQuestions?: {
+    question: string;
+    reason: string;
+    priority: "높음" | "중간" | "낮음";
+    options?: string[];
+  }[];
   fundingComparison: {
     method: string;
     amount: string;
@@ -113,7 +124,11 @@ ${bldLines}
 function buildPrompt(
   answers: Record<string, string | string[]>,
   rentContext?: string,
-  sbizContext?: string
+  sbizContext?: string,
+  flowType: "new" | "existing" = "new",
+  roneContext?: string,
+  bizinfoContext?: string,
+  selectedCategories: string[] = [],
 ): string {
   const lines = Object.entries(answers)
     .filter(([, v]) => v && (Array.isArray(v) ? v.length > 0 : v.trim() !== ""))
@@ -125,15 +140,37 @@ function buildPrompt(
   const sbizSection = sbizContext
     ? `\n[소상공인 상가정보 데이터]\n${sbizContext}\n`
     : "";
+  const roneSection = roneContext
+    ? `\n[한국부동산원 R-ONE 데이터]\n${roneContext}\n`
+    : "";
+  const bizinfoSection = bizinfoContext
+    ? `\n[중소벤처24/기타 지원사업 데이터]\n${bizinfoContext}\n`
+    : "";
 
-  return `당신은 소상공인 창업 전문 AI 컨설턴트입니다. 음식·외식업 분야를 중심으로 분석합니다.
+  const flowLabel =
+    flowType === "existing" ? "기존 사장님(운영 개선)" : "신생 창업자(창업 준비)";
+  const categorySection =
+    flowType === "existing" && selectedCategories.length > 0
+      ? `\n[사용자 선택 카테고리]\n- ${selectedCategories.join(", ")}\n`
+      : "";
 
-아래는 신생 창업자의 설문 응답입니다:
-${lines.join("\n")}${rentSection}${sbizSection}
+  return `당신은 소상공인 전문 AI 컨설턴트입니다. 음식·외식업 분야를 중심으로 분석합니다.
+
+분석 대상 유형: ${flowLabel}
+
+아래는 사용자 고정 질문 응답입니다:
+${lines.join("\n")}${categorySection}${rentSection}${sbizSection}${roneSection}${bizinfoSection}
 
 위 응답을 바탕으로 다음 JSON 형식으로만 응답하세요. 다른 텍스트 없이 JSON만 출력하세요:
 
 {
+  "solutionQuestions": [
+    {
+      "question": "솔루션 정확도를 높이기 위한 추가 질문",
+      "reason": "왜 필요한 질문인지",
+      "priority": "높음"
+    }
+  ],
   "fundingComparison": [
     {
       "method": "자금 조달 방법명 (예: 소상공인 정책자금, 은행 대출, 자기자본, 지인 투자)",
@@ -224,6 +261,16 @@ ${lines.join("\n")}${rentSection}${sbizSection}
 }
 
 규칙:
+- isAnswerSufficient:
+  - 현재 정보만으로 실행 가능한 솔루션이 충분하면 true
+  - 추가 확인이 필요하면 false
+- insufficiencyReason:
+  - isAnswerSufficient가 false일 때만, 부족한 이유를 한 문장으로 작성
+- solutionQuestions:
+  - isAnswerSufficient가 false일 때만 2~5개 생성
+  - isAnswerSufficient가 true이면 빈 배열 []
+  - 반드시 '고정 질문 응답 + API 팩트 데이터 + 이미 받은 추가답변'을 근거로 작성. generic 질문 금지.
+- flowType이 existing이고 사용자 선택 카테고리가 있으면, solutionQuestions는 반드시 해당 카테고리 범위 내에서만 생성.
 - fundingComparison: 3~4가지 방법 비교, recommended는 최대 1개만 true
 - sbizAnalysis: 소상공인 API 데이터가 제공된 경우 해당 데이터 기반으로 분석. 없으면 지역 일반 지식 기반. storeBreakdown은 3~5개 업종 (count는 제공 데이터 기반 or 추정치), competition은 "높음"/"중간"/"낮음" 중 하나. overallScore는 50~95. locationRecommendations는 3개 (rank 1~3)
 - riskFactors: 4~5개, level은 "높음"/"중간"/"낮음" 중 하나
@@ -235,30 +282,63 @@ ${lines.join("\n")}${rentSection}${sbizSection}
 - trialRunPlan: phases는 3단계(소프트오픈 1~2주 / 정식오픈 1~2개월 / 안정화 3개월). kpis는 단계별 2~3개 측정 지표와 목표치. feedbackChannels는 3~4개. warningSignals는 철수·재검토 판단 기준 3개`;
 }
 
+function roneContextToText(rone?: RoneRentContext | null): string | undefined {
+  if (!rone) return undefined;
+  const lines = (rone.items ?? [])
+    .slice(0, 6)
+    .map((item) => `- ${item.region} ${item.type}: 임대지수 ${item.rentIndex}, 공실률 ${item.vacancyRate}%`)
+    .join("\n");
+  return `[${rone.source}] ${rone.period}\n${lines || "- 데이터 없음"}`;
+}
+
+function bizinfoContextToText(bizinfo?: BizinfoContext | null): string | undefined {
+  if (!bizinfo) return undefined;
+  const lines = (bizinfo.items ?? [])
+    .slice(0, 6)
+    .map((item) => `- ${item.pblancNm} (${item.institution}) / ${item.period}`)
+    .join("\n");
+  return `[지원사업 요약] 총 ${bizinfo.totalCount}건\n${lines || "- 데이터 없음"}`;
+}
+
 export async function analyzeStartup(
   answers: Record<string, string | string[]>,
-  sbizData?: SbizStoreData | null,
-  commercialCtx?: CommercialContext | null
-): Promise<AiAnalysisResult> {
-  const rentContext = commercialCtx ? commercialContextToText(commercialCtx) : undefined;
-  const sbizContext = sbizData ? sbizContextToText(sbizData) : undefined;
-
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+  _sbizData?: SbizStoreData | null,
+  _commercialCtx?: CommercialContext | null,
+  flowType: "new" | "existing" = "new",
+  _roneCtx?: RoneRentContext | null,
+  _bizinfoCtx?: BizinfoContext | null,
+  selectedCategories: string[] = [],
+  reportId?: number | null,
+  followupAnswers?: Record<string, string>,
+): Promise<AiAnalysisResult & { reportId: number; status: string }> {
+  const response = await fetch("/api/analysis/next", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${API_KEY}`,
     },
     body: JSON.stringify({
-      model: "gpt-4o-mini",
-      messages: [{ role: "user", content: buildPrompt(answers, rentContext, sbizContext) }],
-      temperature: 0.7,
-      response_format: { type: "json_object" },
+      reportId,
+      flowType,
+      answers,
+      followupAnswers,
+      selectedCategories,
     }),
   });
 
-  if (!response.ok) throw new Error(`OpenAI API error: ${response.status}`);
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({} as any));
+    if (err?.error === "AI_NOT_CONNECTED") {
+      throw new Error("AI_NOT_CONNECTED");
+    }
+    throw new Error(
+      err?.error
+        ? `분석 파이프라인 오류: ${response.status} (${err.error})`
+        : `분석 파이프라인 오류: ${response.status}`,
+    );
+  }
 
-  const data = await response.json();
-  return JSON.parse(data.choices[0].message.content) as AiAnalysisResult;
+  return (await response.json()) as AiAnalysisResult & {
+    reportId: number;
+    status: string;
+  };
 }
