@@ -24,6 +24,14 @@ repositories {
     mavenCentral()
 }
 
+sourceSets {
+    main {
+        resources {
+            srcDirs = ['sosan-main/src/main/resources']
+        }
+    }
+}
+
 dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.springframework.boot:spring-boot-starter-webmvc'
@@ -55,7 +63,7 @@ tasks.named('test') {
 }
 
 // MySQL 연결 실패 시: .\gradlew.bat bootRun -Pdev
-// MySQL 사용 시: application-local.properties 에 비밀번호 설정 후 .\gradlew.bat bootRun
+// 설정 파일: sosan-main/src/main/resources/application.properties
 tasks.named('bootRun') {
     if (project.hasProperty('dev')) {
         args '--spring.profiles.active=dev'

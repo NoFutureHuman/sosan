@@ -1,8 +1,8 @@
 spring.application.name=sosang-workspace
 
-# clone 후 application-local.properties 를 만들고 키를 넣으세요 (Git 제외).
+# application.properties.example 을 복사해 application.properties 를 만들고 키를 넣으세요.
 
-openai.api.key=${OPENAI_API_KEY:}
+openai.api.key=
 
 api.key.nts=
 api.key.kamis=
@@ -21,7 +21,6 @@ kamis.api.key=${api.key.kamis}
 spring.datasource.url=jdbc:mysql://${DB_HOST:localhost}:3306/sosang_db?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=Asia/Seoul&characterEncoding=UTF-8&allowPublicKeyRetrieval=true
 spring.datasource.username=${DB_USERNAME:root}
 spring.datasource.password=${DB_PASSWORD:}
-spring.config.import=optional:classpath:application-local.properties
 spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
 
 spring.jpa.hibernate.ddl-auto=update

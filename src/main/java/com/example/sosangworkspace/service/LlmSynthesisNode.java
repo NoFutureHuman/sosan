@@ -37,7 +37,7 @@ public class LlmSynthesisNode implements AsyncNodeAction<SosangState> {
                 log.info("[LlmSynthesisNode] 보고서 생성 시작 - 업종: {}", answers.get("bizType"));
 
                 if (openaiApiKey == null || openaiApiKey.isBlank()) {
-                    log.warn("[LlmSynthesisNode] OpenAI API 키 미설정 - application-local.properties 확인 필요");
+                    log.warn("[LlmSynthesisNode] OpenAI API 키 미설정 - application.properties 의 openai.api.key 확인 필요");
                     return Map.of("report", buildFallbackReport(answers));
                 }
 
