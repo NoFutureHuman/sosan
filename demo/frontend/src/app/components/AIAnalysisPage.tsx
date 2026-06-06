@@ -827,6 +827,7 @@
         (import.meta.env.VITE_API_BASE as string | undefined)?.replace(/\/$/, "") ||
         "http://localhost:8081";
     const MAX_DYNAMIC_ROUNDS = 2;
+    const MAX_DEEP_FOLLOWUP_ROUNDS = 50;
 
     /** AI가 동적으로 생성하는 추가 질문 (신생 창업자) */
     type GeneratedQuestion = {
@@ -1041,7 +1042,7 @@
         const [followupChoices, setFollowupChoices] = useState<Record<string, string>>({});
         const [followupEtcInputs, setFollowupEtcInputs] = useState<Record<string, string>>({});
         const [isSubmittingFollowup, setIsSubmittingFollowup] = useState(false);
-        const [followupCategoryPageRound, setFollowupCategoryPageRound] = useState<1 | 2>(1);
+        const [followupCategoryPageRound, setFollowupCategoryPageRound] = useState(1);
         const [followupAnswers, setFollowupAnswers] = useState<Record<string, string>>({});
         const [commercialCtx, setCommercialCtx] = useState<CommercialContext | null>(null);
         const [sbizData, setSbizData] = useState<SbizStoreData | null>(null);
@@ -1183,13 +1184,15 @@
 
         const parseLightPhaseQuestions = (
             data: any,
+            answers: Record<string, string | string[]>,
             priorQuestions: FollowupQuestion[] = [],
-        ) => parsePhaseQuestions(data, priorQuestions);
+        ) => parsePhaseQuestions(data, answers, priorQuestions);
 
         const parseDeepPhaseQuestions = (
             data: any,
+            answers: Record<string, string | string[]>,
             priorQuestions: FollowupQuestion[] = [],
-        ) => parsePhaseQuestions(data, priorQuestions);
+        ) => parsePhaseQuestions(data, answers, priorQuestions);
 
         const parseAnalysisResponse = async (response: Response) => {
             const text = await response.text();
@@ -1282,10 +1285,26 @@
             return data;
         };
 
-        const hasExistingAiResult = (result: any) =>
-            result?.type === "result" &&
-            (Array.isArray(result.improvements) && result.improvements.length > 0 ||
-                typeof result.score === "number");
+        const hasExistingAiResult = (result: any) => {
+            if (result?.type !== "result") return false;
+            if (result.existingSolution?.summary?.trim()) return true;
+            if (
+                Array.isArray(result.categoryInsights) &&
+                result.categoryInsights.some(
+                    (item: { summary?: string; actions?: string[] }) =>
+                        item.summary?.trim() ||
+                        (Array.isArray(item.actions) && item.actions.length > 0),
+                )
+            ) {
+                return true;
+            }
+            return (
+                Array.isArray(result.improvements) &&
+                result.improvements.some((item: { solution?: string }) =>
+                    item.solution?.trim(),
+                )
+            );
+        };
 
         const ensureExistingFinalReport = async (
             inputAnswers: Record<string, string | string[]>,
@@ -1301,7 +1320,7 @@
         };
 
         const showBatchPhaseFollowup = (
-            phase: 1 | 2,
+            phase: number,
             nextQuestions: FollowupQuestion[],
         ) => {
             setFollowupCategoryPageRound(phase);
@@ -1319,18 +1338,18 @@
         ) => {
             const payload = withLightAllPhaseContext(baseAnswers, phase);
             const result = await runExistingAnalysisPipeline(payload, "light");
-            const questions = parseLightPhaseQuestions(result, priorQuestions);
+            const questions = parseLightPhaseQuestions(result, payload, priorQuestions);
             return { result, questions, payload };
         };
 
         const fetchDeepPhaseQuestions = async (
             baseAnswers: Record<string, string | string[]>,
-            phase: 1 | 2,
+            phase: number,
             priorQuestions: FollowupQuestion[] = [],
         ) => {
             const payload = withDeepAllPhaseContext(baseAnswers, phase);
             const result = await runExistingAnalysisPipeline(payload, "deep");
-            const questions = parseDeepPhaseQuestions(result, priorQuestions);
+            const questions = parseDeepPhaseQuestions(result, payload, priorQuestions);
             return { result, questions, payload };
         };
 
@@ -1459,13 +1478,12 @@
                     return;
                 }
 
-                const phase2 =
-                    mode === "light"
-                        ? await fetchLightPhaseQuestions(baseAnswers, 2)
-                        : await fetchDeepPhaseQuestions(baseAnswers, 2);
-                if (phase2.questions.length > 0) {
-                    showBatchPhaseFollowup(2, phase2.questions);
-                    return;
+                if (mode === "light") {
+                    const phase2 = await fetchLightPhaseQuestions(baseAnswers, 2);
+                    if (phase2.questions.length > 0) {
+                        showBatchPhaseFollowup(2, phase2.questions);
+                        return;
+                    }
                 }
 
                 const finalResult = await ensureExistingFinalReport(
@@ -2290,10 +2308,19 @@
                                         }),
                                     );
                                     const followupQuestionMap = Object.fromEntries(
-                                        followupQuestions.map((item, idx) => [
-                                            `followup_question_${existingFollowupCount + idx + 1}`,
-                                            item.question,
-                                        ]),
+                                        followupQuestions.flatMap((item, idx) => {
+                                            const num = existingFollowupCount + idx + 1;
+                                            const entries: [string, string][] = [
+                                                [`followup_question_${num}`, item.question],
+                                            ];
+                                            if (item.category?.trim()) {
+                                                entries.push([
+                                                    `followup_category_${num}`,
+                                                    item.category.trim(),
+                                                ]);
+                                            }
+                                            return entries;
+                                        }),
                                     );
                                     const trimmedFollowup = Object.fromEntries(
                                         Object.entries(resolvedFollowup).map(([k, v]) => [
@@ -2309,23 +2336,32 @@
                                     };
                                     setAnswers(merged);
 
-                                    if (followupCategoryPageRound === 1) {
-                                        setLoadingPurpose("followup");
-                                        const phase2 =
-                                            analysisMode === "light"
-                                                ? await fetchLightPhaseQuestions(
-                                                      merged,
-                                                      2,
-                                                      followupQuestions,
-                                                  )
-                                                : await fetchDeepPhaseQuestions(
-                                                      merged,
-                                                      2,
-                                                      followupQuestions,
-                                                  );
-                                        if (phase2.questions.length > 0) {
-                                            showBatchPhaseFollowup(2, phase2.questions);
-                                            return;
+                                    if (analysisMode === "light") {
+                                        if (followupCategoryPageRound === 1) {
+                                            setLoadingPurpose("followup");
+                                            const phase2 = await fetchLightPhaseQuestions(
+                                                merged,
+                                                2,
+                                                followupQuestions,
+                                            );
+                                            if (phase2.questions.length > 0) {
+                                                showBatchPhaseFollowup(2, phase2.questions);
+                                                return;
+                                            }
+                                        }
+                                    } else {
+                                        const nextPhase = followupCategoryPageRound + 1;
+                                        if (nextPhase <= MAX_DEEP_FOLLOWUP_ROUNDS) {
+                                            setLoadingPurpose("followup");
+                                            const next = await fetchDeepPhaseQuestions(
+                                                merged,
+                                                nextPhase,
+                                                followupQuestions,
+                                            );
+                                            if (next.questions.length > 0) {
+                                                showBatchPhaseFollowup(nextPhase, next.questions);
+                                                return;
+                                            }
                                         }
                                     }
 
@@ -2374,9 +2410,11 @@
                         >
                             {isSubmittingFollowup
                                 ? "처리 중입니다..."
-                                : followupCategoryPageRound === 1
-                                  ? "답변 제출 · 2차 질문 생성"
-                                  : "답변 제출 · 솔루션 생성"}
+                                : analysisMode === "light"
+                                  ? followupCategoryPageRound === 1
+                                      ? "답변 제출 · 2차 질문 생성"
+                                      : "답변 제출 · 솔루션 생성"
+                                  : "답변 제출 · 다음 질문 생성"}
                         </button>
                     </div>
                 </div>

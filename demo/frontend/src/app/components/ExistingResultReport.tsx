@@ -1241,96 +1241,220 @@ function getDeepExecutionNotes(label: string, metrics: PosMetrics) {
   };
 }
 
+const CATEGORY_INFER_KEYWORDS: Record<string, string[]> = {
+  "매출 성과": ["매출", "객단가", "주문", "성장", "피크"],
+  "마케팅 역량": ["마케팅", "광고", "홍보", "sns", "프로모션", "유입"],
+  "단골 확보": ["단골", "재방문", "충성", "고객층", "재방문율"],
+  "평판 관리": ["리뷰", "평점", "평판", "평가", "불만"],
+  "가격 경쟁력": ["가격", "메뉴가", "원가", "할인", "경쟁"],
+  "운영 효율": ["운영", "인력", "좌석", "회전", "체크리스트", "피크"],
+};
+
+function isMissingAnswer(answer: string): boolean {
+  const text = answer.trim();
+  return !text || text === "미입력" || text === "미응답";
+}
+
+function categoriesAlign(left: string, right: string): boolean {
+  const a = normalizeCategoryLabel(left);
+  const b = normalizeCategoryLabel(right);
+  if (!a || !b) return false;
+  if (a === b) return true;
+  return a.includes(b) || b.includes(a);
+}
+
+function resolveFollowupCategory(
+  storedCategory: string,
+  question: string,
+  categoryLabels: string[] = [],
+): string {
+  if (storedCategory.trim()) {
+    const stored = storedCategory.trim();
+    const matched = categoryLabels.find((label) => categoriesAlign(stored, label));
+    return matched ?? stored;
+  }
+
+  const q = question.toLowerCase();
+  for (const label of categoryLabels) {
+    const keywords = CATEGORY_INFER_KEYWORDS[label] ?? [];
+    if (keywords.some((kw) => q.includes(kw))) return label;
+  }
+
+  for (const [label, keywords] of Object.entries(CATEGORY_INFER_KEYWORDS)) {
+    if (keywords.some((kw) => q.includes(kw))) {
+      if (categoryLabels.length === 0 || categoryLabels.includes(label)) {
+        return label;
+      }
+    }
+  }
+
+  if (categoryLabels.length === 1) {
+    return categoryLabels[0];
+  }
+
+  return "";
+}
+
+function followupMatchesCategory(
+  item: { category?: string; question: string },
+  categoryLabel: string,
+  categoryLabels: string[] = [],
+): boolean {
+  const resolved = resolveFollowupCategory(
+    item.category ?? "",
+    item.question,
+    categoryLabels.length > 0 ? categoryLabels : [categoryLabel],
+  );
+  if (!resolved) return false;
+  return categoriesAlign(resolved, categoryLabel);
+}
+
 function getFollowupQaItems(
   answers: Record<string, string | string[]>,
-): QaItem[] {
+  categoryLabels: string[] = [],
+): Array<QaItem & { category?: string }> {
   const entries = Object.keys(answers)
     .filter(
       (key) =>
-        key.startsWith("followup_") && !key.startsWith("followup_question_"),
+        key.startsWith("followup_") &&
+        !key.startsWith("followup_question_") &&
+        !key.startsWith("followup_category_"),
     )
     .map((key) => {
       const num = Number(key.replace("followup_", ""));
       const qKey = `followup_question_${num}`;
+      const cKey = `followup_category_${num}`;
       const question = toText(answers[qKey], `추가 질문 ${num}`);
       const answer = toText(answers[key], "미응답");
-      return { num, question, answer };
+      const storedCategory = toText(answers[cKey], "");
+      const category = resolveFollowupCategory(storedCategory, question, categoryLabels);
+      return { num, question, answer, category };
     })
     .filter((item) => Number.isFinite(item.num))
     .sort((a, b) => a.num - b.num);
 
-  return entries.map((item) => ({
-    question: item.question,
-    answer: item.answer,
-    score: 70,
-  }));
+  return entries
+    .filter((item) => !isMissingAnswer(item.answer))
+    .map((item) => ({
+      question: item.question,
+      answer: item.answer,
+      score: 70,
+      category: item.category || undefined,
+    }));
 }
 
-const FOLLOWUP_COLLAPSE_THRESHOLD = 5;
+function getCategoryDisplayQaItems(
+  label: string,
+  answers: Record<string, string | string[]>,
+  followupItems: Array<QaItem & { category?: string }>,
+  categoryLabels: string[] = [],
+): QaItem[] {
+  const labels = categoryLabels.length > 0 ? categoryLabels : [label];
+  const followup = followupItems.filter((item) =>
+    followupMatchesCategory(item, label, labels),
+  );
 
-function CollapsibleFollowupHistory({
+  if (followup.length > 0) {
+    return followup;
+  }
+
+  return getCategoryQa(label, answers).filter((item) => !isMissingAnswer(item.answer));
+}
+
+function CollapsibleQaSection({
+  title,
+  subtitle,
   items,
+  compact = false,
 }: {
+  title: string;
+  subtitle?: string;
   items: Array<{ question: string; answer: string }>;
+  compact?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   if (items.length === 0) return null;
-  const shouldCollapse = items.length > FOLLOWUP_COLLAPSE_THRESHOLD;
+
+  const preview = items
+    .slice(0, 2)
+    .map((item) => item.answer)
+    .filter((answer) => !isMissingAnswer(answer))
+    .join(" · ");
 
   return (
     <div
-      className="mt-6 rounded-2xl p-5"
-      style={{
-        background: "rgba(255,255,255,0.04)",
-        border: "1px solid rgba(255,255,255,0.1)",
-      }}
+      className={compact ? "mb-6 rounded-xl border border-white/10 bg-white/5 px-4 py-4" : "mt-6 rounded-2xl p-5"}
+      style={
+        compact
+          ? undefined
+          : {
+              background: "rgba(255,255,255,0.04)",
+              border: "1px solid rgba(255,255,255,0.1)",
+            }
+      }
     >
       <button
         type="button"
-        onClick={() => {
-          if (shouldCollapse) setExpanded((prev) => !prev);
-        }}
+        onClick={() => setExpanded((prev) => !prev)}
         className="w-full flex items-center justify-between gap-3"
         style={{
           background: "none",
           border: "none",
           padding: 0,
-          cursor: shouldCollapse ? "pointer" : "default",
+          cursor: "pointer",
           textAlign: "left",
         }}
       >
-        <p style={{ fontSize: "0.9rem", fontWeight: 700, margin: 0 }}>
-          AI 추가 질문 응답 반영 내역
-          {shouldCollapse && (
+        <div>
+          <p
+            style={{
+              fontSize: compact ? "0.75rem" : "0.9rem",
+              fontWeight: 700,
+              margin: 0,
+              color: compact ? "rgb(161 161 170)" : "white",
+            }}
+          >
+            {title}
             <span
               style={{
                 marginLeft: "8px",
-                fontSize: "0.78rem",
+                fontSize: compact ? "0.72rem" : "0.78rem",
                 fontWeight: 600,
                 color: "rgba(255,255,255,0.45)",
               }}
             >
-              총 {items.length}개
+              {items.length}건
             </span>
-          )}
-        </p>
-        {shouldCollapse && (
-          <span
-            className="inline-flex items-center gap-1 flex-shrink-0"
-            style={{ fontSize: "0.78rem", fontWeight: 600, color: "#34d399" }}
-          >
-            {expanded ? "접기" : "펼치기"}
-            <ChevronDown
-              className="w-4 h-4"
+          </p>
+          {!expanded && (
+            <p
               style={{
-                transform: expanded ? "rotate(180deg)" : "rotate(0deg)",
-                transition: "transform 0.2s ease",
+                fontSize: compact ? "0.72rem" : "0.78rem",
+                color: "rgba(255,255,255,0.45)",
+                margin: "6px 0 0",
               }}
-            />
-          </span>
-        )}
+            >
+              {preview
+                ? `선택 응답: ${preview.length > 72 ? `${preview.slice(0, 72)}…` : preview}`
+                : subtitle ?? "펼치면 질문과 선택한 답변을 확인할 수 있습니다."}
+            </p>
+          )}
+        </div>
+        <span
+          className="inline-flex items-center gap-1 flex-shrink-0"
+          style={{ fontSize: "0.78rem", fontWeight: 600, color: "#34d399" }}
+        >
+          {expanded ? "접기" : "펼치기"}
+          <ChevronDown
+            className="w-4 h-4"
+            style={{
+              transform: expanded ? "rotate(180deg)" : "rotate(0deg)",
+              transition: "transform 0.2s ease",
+            }}
+          />
+        </span>
       </button>
-      {(!shouldCollapse || expanded) && (
+      {expanded && (
         <div className="space-y-3 mt-3">
           {items.map((item, idx) => (
             <div
@@ -1349,12 +1473,22 @@ function CollapsibleFollowupHistory({
               </div>
               <div
                 style={{
-                  fontSize: "0.8rem",
-                  color: "rgba(255,255,255,0.55)",
-                  marginTop: "6px",
+                  fontSize: "0.72rem",
+                  color: "rgba(255,255,255,0.45)",
+                  marginTop: "8px",
+                  marginBottom: "4px",
                 }}
               >
-                A. {item.answer}
+                선택한 답변
+              </div>
+              <div
+                style={{
+                  fontSize: "0.84rem",
+                  color: "#a7f3d0",
+                  fontWeight: 600,
+                }}
+              >
+                {item.answer}
               </div>
             </div>
           ))}
@@ -1442,16 +1576,94 @@ function getCategoryInsightFromAi(
     | undefined;
 }
 
+type CategoryInsight = {
+  category?: string;
+  summary?: string;
+  signals?: string[];
+  actions?: string[];
+};
+
+function buildFromCategoryInsights(insights: CategoryInsight[]): AiData | null {
+  const usable = insights.filter(
+    (item) =>
+      item.summary?.trim() ||
+      (item.actions?.length ?? 0) > 0 ||
+      (item.signals?.length ?? 0) > 0,
+  );
+  if (usable.length === 0) return null;
+
+  const summary =
+    usable
+      .map((item) => item.summary?.trim())
+      .filter(Boolean)
+      .join(" ") ||
+    usable
+      .flatMap((item) => item.signals ?? [])
+      .filter(Boolean)
+      .slice(0, 2)
+      .join(" ");
+
+  const actions = usable
+    .flatMap((item) => (item.actions ?? []).filter(Boolean))
+    .slice(0, 6);
+
+  const detailed = usable
+    .map((item) => {
+      const lines = [`【${item.category ?? "분석"}】`, item.summary?.trim() || ""];
+      (item.signals ?? []).forEach((signal) => lines.push(`· ${signal}`));
+      (item.actions ?? []).forEach((action) => lines.push(`→ ${action}`));
+      return lines.filter(Boolean).join("\n");
+    })
+    .join("\n\n");
+
+  if (!summary.trim() && actions.length === 0) return null;
+  return {
+    summary: summary.trim() || actions[0],
+    actions,
+    detailed: detailed || summary.trim(),
+  };
+}
+
 function buildExistingSolutionFromAi(aiResult: any): AiData | null {
-  if (!aiResult) return null;
+  if (!aiResult || aiResult.type !== "result") return null;
 
   const dedicated = aiResult.existingSolution;
+  const categoryInsights = Array.isArray(aiResult.categoryInsights)
+    ? (aiResult.categoryInsights as CategoryInsight[])
+    : [];
+  const fromCategories = buildFromCategoryInsights(categoryInsights);
+
   if (dedicated?.summary?.trim()) {
     return {
       summary: dedicated.summary.trim(),
       actions: (dedicated.actionItems ?? []).filter(Boolean).slice(0, 6),
       detailed: (dedicated.detailedGuide ?? dedicated.summary).trim(),
     };
+  }
+
+  if (
+    (dedicated?.actionItems?.length ?? 0) > 0 ||
+    dedicated?.detailedGuide?.trim()
+  ) {
+    return {
+      summary:
+        dedicated?.summary?.trim() ||
+        fromCategories?.summary ||
+        "선택하신 카테고리와 추가 답변을 반영한 맞춤 진단입니다.",
+      actions:
+        (dedicated?.actionItems ?? []).filter(Boolean).slice(0, 6) ||
+        fromCategories?.actions ||
+        [],
+      detailed:
+        dedicated?.detailedGuide?.trim() ||
+        fromCategories?.detailed ||
+        dedicated?.summary?.trim() ||
+        "",
+    };
+  }
+
+  if (fromCategories) {
+    return fromCategories;
   }
 
   const summary = aiResult.sbizAnalysis?.summary?.trim();
@@ -1484,29 +1696,79 @@ function buildExistingSolutionFromAi(aiResult: any): AiData | null {
     return { summary, actions, detailed };
   }
 
-  if (
-    aiResult.type === "result" &&
-    Array.isArray(aiResult.improvements) &&
-    aiResult.improvements.length > 0
-  ) {
+  if (Array.isArray(aiResult.improvements) && aiResult.improvements.length > 0) {
     const improvements = aiResult.improvements as Array<{
       category?: string;
       solution?: string;
     }>;
+    const detailed = improvements
+      .map((item) => `【${item.category ?? "개선"}】\n${item.solution ?? ""}`)
+      .filter((block) => block.trim().length > 2)
+      .join("\n\n");
+    const firstLine =
+      improvements
+        .map((item) => item.solution?.trim().split("\n")[0])
+        .find(Boolean) ?? "";
+    const actions = improvements
+      .flatMap((item) =>
+        (item.solution ?? "")
+          .split("\n")
+          .map((line) => line.replace(/^•\s*/, "").trim())
+          .filter(Boolean),
+      )
+      .slice(0, 6);
+
+    if (!detailed && actions.length === 0) return null;
+
     return {
-      summary: `AI 종합 분석 점수 ${aiResult.score ?? 75}점 — 선택하신 카테고리 기준 맞춤 개선안입니다.`,
-      actions: improvements
-        .map((item) =>
-          item.category ? `${item.category} 집중 개선` : "운영 개선",
-        )
-        .slice(0, 6),
-      detailed: improvements
-        .map((item) => `【${item.category ?? "개선"}】\n${item.solution ?? ""}`)
-        .join("\n\n"),
+      summary:
+        firstLine ||
+        improvements
+          .map((item) => item.solution?.trim())
+          .filter(Boolean)
+          .join(" ")
+          .slice(0, 220),
+      actions:
+        actions.length > 0
+          ? actions
+          : improvements
+              .map((item) => item.category)
+              .filter(Boolean)
+              .slice(0, 6),
+      detailed: detailed || firstLine,
     };
   }
 
   return null;
+}
+
+function resolveExistingAiPresentation(
+  aiResult: any,
+  fallbackInput: {
+    challenge: string;
+    storeSize: string;
+    operationScore: number;
+    analysisMode: AnalysisMode;
+    posMetrics: PosMetrics;
+  },
+): { data: AiData | null; source: "ai" | "fallback" | "missing" } {
+  const fromAi = buildExistingSolutionFromAi(aiResult);
+  if (fromAi) {
+    return { data: fromAi, source: "ai" };
+  }
+  if (aiResult?.type === "result") {
+    return { data: null, source: "missing" };
+  }
+  return {
+    data: buildAiData(
+      fallbackInput.challenge,
+      fallbackInput.storeSize,
+      fallbackInput.operationScore,
+      fallbackInput.analysisMode,
+      fallbackInput.posMetrics,
+    ),
+    source: "fallback",
+  };
 }
 
 export function ExistingResultReport({
@@ -1533,7 +1795,14 @@ export function ExistingResultReport({
   const navigate = useNavigate();
 
   const [stage, setStage] = useState(0);
-  const followupQaItems = useMemo(() => getFollowupQaItems(answers), [answers]);
+  const appliedCategories = useMemo(
+    () => resolveAppliedCategories(selectedCategories, answers, aiResult),
+    [selectedCategories, answers, aiResult],
+  );
+  const followupQaItems = useMemo(
+    () => getFollowupQaItems(answers, appliedCategories),
+    [answers, appliedCategories],
+  );
   const kamisReportItems = useMemo(
     () => kamisItemsToReportBullets(kamisData?.items ?? [], 8),
     [kamisData],
@@ -1626,11 +1895,6 @@ export function ExistingResultReport({
     },
   ];
 
-  const appliedCategories = resolveAppliedCategories(
-    selectedCategories,
-    answers,
-    aiResult,
-  );
   const filteredAiResult = useMemo(
     () => filterAiResultByCategories(aiResult, appliedCategories),
     [aiResult, appliedCategories],
@@ -1661,18 +1925,26 @@ export function ExistingResultReport({
         ? "중규모"
         : "소규모";
 
-  const resolvedAiData = useMemo(
+  const aiPresentation = useMemo(
     () =>
-      buildExistingSolutionFromAi(filteredAiResult) ??
-      buildAiData(
+      resolveExistingAiPresentation(filteredAiResult, {
         challenge,
         storeSize,
         operationScore,
         analysisMode,
         posMetrics,
-      ),
-    [filteredAiResult, challenge, storeSize, operationScore, analysisMode, posMetrics],
+      }),
+    [
+      filteredAiResult,
+      challenge,
+      storeSize,
+      operationScore,
+      analysisMode,
+      posMetrics,
+    ],
   );
+  const resolvedAiData = aiPresentation.data;
+  const aiContentSource = aiPresentation.source;
 
   const categoryPages = useMemo(
     () =>
@@ -1691,25 +1963,26 @@ export function ExistingResultReport({
           avgScore: getCategoryAverageScore(stat.label),
           oneLiner:
             aiCategory?.summary ??
-            resolvedAiData?.summary ??
             getCategoryOneLiner(
               stat.label,
               stat.value,
               getCategoryAverageScore(stat.label),
             ),
-          qaItems:
-            followupQaItems.length > 0
-              ? followupQaItems
-              : getCategoryQa(stat.label, answers),
+          qaItems: getCategoryDisplayQaItems(
+            stat.label,
+            answers,
+            followupQaItems,
+            appliedCategories,
+          ),
           solutions:
-            aiCategory?.actions ??
-            resolvedAiData?.actions ??
-            getCategorySolutions(stat.label, stat.value, answers),
+            aiCategory?.actions?.length
+              ? aiCategory.actions
+              : getCategorySolutions(stat.label, stat.value, answers),
           signals,
           supports: getCategorySupportItems(stat.label, region, bizType),
         };
       }),
-    [detailStats, region, bizType, answers, followupQaItems, filteredAiResult, resolvedAiData],
+    [detailStats, region, bizType, answers, followupQaItems, filteredAiResult, resolvedAiData, appliedCategories],
   );
 
   const currentInsight = useMemo(() => {
@@ -1862,7 +2135,9 @@ export function ExistingResultReport({
               style={{ width: `${((stage + 1) / TOTAL_STAGES) * 100}%` }}
             />
           </div>
-          <CollapsibleFollowupHistory
+          <CollapsibleQaSection
+            title="AI 추가 질문 응답 반영 내역"
+            subtitle="펼치면 추가 질문과 선택한 답변을 확인할 수 있습니다."
             items={followupQaItems.map((item) => ({
               question: item.question,
               answer: item.answer,
@@ -2020,29 +2295,14 @@ export function ExistingResultReport({
                       <h2 className="text-3xl font-extrabold mb-3 text-white">
                         {categoryPages[stage - 1].label}
                       </h2>
-                      <div>
-                        <div className="text-xs text-zinc-400 mb-3 font-semibold">
-                          분석에 반영된 질문과 응답
-                        </div>
-                        <div className="mb-6 rounded-xl border border-white/10 bg-white/5 px-4 py-4">
-                          {categoryPages[stage - 1].qaItems.map((qa) => (
-                            <div key={qa.question} className="mb-3 last:mb-0">
-                              <div className="text-xs text-zinc-400 mb-1">
-                                질문
-                              </div>
-                              <div className="text-sm text-white mb-1">
-                                {qa.question}
-                              </div>
-                              <div className="text-xs text-zinc-400 mb-1">
-                                응답
-                              </div>
-                              <div className="text-sm text-emerald-200">
-                                {qa.answer}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
+                      <CollapsibleQaSection
+                        compact
+                        title="이 카테고리 추가 질문 · 선택 답변"
+                        items={categoryPages[stage - 1].qaItems.map((qa) => ({
+                          question: qa.question,
+                          answer: qa.answer,
+                        }))}
+                      />
                     </div>
 
                     {/* 오른쪽 컬럼 (AI 추천, 솔루션) */}
@@ -2222,6 +2482,12 @@ export function ExistingResultReport({
               <div className="text-xs text-emerald-400 font-bold mb-2">
                 AI 솔루션 요약
               </div>
+              {aiContentSource === "fallback" && (
+                <p className="text-xs text-amber-300 mb-3">
+                  AI 최종 리포트를 받지 못해 기본 가이드 문구를 표시합니다. 재분석을
+                  권장합니다.
+                </p>
+              )}
               {isAiLoading ? (
                 <div className="h-[240px] flex flex-col items-center justify-center text-zinc-500">
                   <Sparkles className="w-8 h-8 text-emerald-400 animate-pulse mb-3" />

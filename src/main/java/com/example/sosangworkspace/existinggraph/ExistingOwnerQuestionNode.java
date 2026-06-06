@@ -99,6 +99,7 @@ class ExistingOwnerQuestionNode implements AsyncNodeAction<ExistingOwnerGraphSta
             return questionNodeSingle(state);
         }
 
+        Set<String> prior = ExistingOwnerContextBuilder.extractPriorFollowupQuestions(state.answers().orElse(Map.of()));
         List<Map<String, Object>> results = parallelCategoryCalls(
                 categories,
                 cat -> {
@@ -106,14 +107,13 @@ class ExistingOwnerQuestionNode implements AsyncNodeAction<ExistingOwnerGraphSta
                     Map<String, Object> parsed = openAiClient.invokeJson(
                             prompt, "QD_ALL_" + cat + "_P" + phase, 3200
                     );
-                    return ExistingOwnerQuestionLogic.normalizeQuestions(
-                            parsed, Set.of(), false, false
-                    );
+                    return ExistingOwnerQuestionLogic.normalizeQuestions(parsed, prior, true, true);
                 }
         );
 
         Map<String, Object> merged = ExistingOwnerQuestionLogic.mergeQuestionResults(results);
-        merged = ExistingOwnerQuestionLogic.normalizeQuestions(merged, Set.of(), false, false);
+        merged = ExistingOwnerQuestionLogic.normalizeQuestions(merged, prior, true, true);
+        merged = ExistingOwnerQuestionLogic.finalizeDeepQuestionResult(state, merged, prior, openAiClient);
         Object questionsRaw = merged.get("solutionQuestions");
         List<?> questions = questionsRaw instanceof List<?> list ? list : List.of();
         merged.put("lightFollowupPages", List.of(Map.of(
@@ -136,12 +136,12 @@ class ExistingOwnerQuestionNode implements AsyncNodeAction<ExistingOwnerGraphSta
                 cat -> {
                     String prompt = ExistingOwnerPromptBuilder.buildDeepCategoryQuestionPrompt(state, cat);
                     Map<String, Object> parsed = openAiClient.invokeJson(prompt, "Q_" + cat, 2200);
-                    return ExistingOwnerQuestionLogic.normalizeQuestions(parsed, prior);
+                    return ExistingOwnerQuestionLogic.normalizeQuestions(parsed, prior, true, true);
                 }
         );
 
         Map<String, Object> merged = ExistingOwnerQuestionLogic.mergeQuestionResults(results);
-        merged = ExistingOwnerQuestionLogic.normalizeQuestions(merged, prior);
+        merged = ExistingOwnerQuestionLogic.normalizeQuestions(merged, prior, true, true);
         merged = ExistingOwnerQuestionLogic.finalizeDeepQuestionResult(state, merged, prior, openAiClient);
         return merged;
     }

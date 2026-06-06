@@ -17,6 +17,14 @@ class ExistingOwnerFinalizeReportNode implements AsyncNodeAction<ExistingOwnerGr
             Map<String, Object> report = new LinkedHashMap<>(state.reportResult().orElse(Map.of()));
             Map<String, Object> ragScores = state.ragScores().orElse(Map.of());
 
+            if ("existing".equals(state.flowType().orElse("new"))) {
+                List<String> cats = state.selectedCategories().orElse(List.of()).stream()
+                        .map(String::valueOf)
+                        .toList();
+                report = ExistingOwnerCategoryInsightsNormalizer.normalizeCategoryInsights(report, cats);
+                report = ExistingOwnerReportEnricher.enrichExistingSolution(report);
+            }
+
             Map<String, Object> llmResult = new LinkedHashMap<>();
             llmResult.put("isAnswerSufficient", true);
             llmResult.put("insufficiencyReason", "");

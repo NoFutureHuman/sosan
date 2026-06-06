@@ -117,12 +117,13 @@ export function mapDynamicQuestionsToFollowup(questions: any[]): FollowupQuestio
 
 export function parsePhaseQuestions(
   data: any,
+  answers: Record<string, string | string[]> = {},
   priorQuestions: FollowupQuestion[] = [],
 ): FollowupQuestion[] {
   const mapped = mapDynamicQuestionsToFollowup(data?.questions ?? []);
   return filterUniqueFollowupQuestions(
     mapped,
-    collectAskedFollowupQuestions({}, priorQuestions),
+    collectAskedFollowupQuestions(answers, priorQuestions),
     false,
   );
 }
@@ -142,7 +143,7 @@ export function withLightAllPhaseContext(
 
 export function withDeepAllPhaseContext(
   base: Record<string, string | string[]>,
-  phase: 1 | 2,
+  phase: number,
 ): Record<string, string | string[]> {
   return {
     ...base,
@@ -170,9 +171,11 @@ export function buildFinalUserAnswers(
     .forEach((qKey) => {
       const num = qKey.replace("followup_question_", "");
       const aKey = `followup_${num}`;
+      const cKey = `followup_category_${num}`;
       items.push({
         question: String(answers[qKey] ?? ""),
         answer: String(answers[aKey] ?? ""),
+        category: String(answers[cKey] ?? ""),
       });
     });
   return items;

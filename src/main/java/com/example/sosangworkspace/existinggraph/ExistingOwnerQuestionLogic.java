@@ -44,7 +44,14 @@ final class ExistingOwnerQuestionLogic {
         if (raw.isEmpty()) {
             raw = ExistingOwnerTextUtils.toStr(answers.get("lightFollowupCategoryPage")).strip();
         }
-        return "2".equals(raw) ? 2 : 1;
+        if (raw.isEmpty()) {
+            raw = ExistingOwnerTextUtils.toStr(answers.get("followupPhase")).strip();
+        }
+        try {
+            return Math.max(1, Integer.parseInt(raw));
+        } catch (NumberFormatException ignored) {
+            return 1;
+        }
     }
 
     static Map<String, Object> mergeQuestionResults(List<Map<String, Object>> results) {
@@ -145,7 +152,7 @@ final class ExistingOwnerQuestionLogic {
     }
 
     static Map<String, Object> normalizeQuestions(Map<String, Object> result, Set<String> priorQuestions) {
-        return normalizeQuestions(result, priorQuestions, false, true);
+        return normalizeQuestions(result, priorQuestions, true, true);
     }
 
     static Map<String, Object> boostDeepQuestions(

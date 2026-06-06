@@ -153,17 +153,17 @@ final class ExistingOwnerPromptBuilder {
         String ctx = ExistingOwnerContextBuilder.baseContext(state, true);
         String priorBlock = ExistingOwnerContextBuilder.priorFollowupBlock(state);
         String ragHint = ExistingOwnerJsonUtils.toCompactJson(state.ragScores().orElse(Map.of()));
-        String phaseLabel = phase == 1 ? "1차(1페이지)" : "2차(2페이지)";
+        String phaseLabel = phase + "차(페이지)";
         String phaseExtra;
-        if (phase == 2) {
+        if (phase > 1) {
             phaseExtra = """
-                    - answers의 **1차 추가질문 답변**을 반영해 심화·후속 질문만 생성.
-                    - 1차와 표현만 다른 유사 질문도 허용(집중분석은 중복 제한 없음).
+                    - 이전 라운드 추가질문 답변을 반영해 **새로운 주제**의 심화·후속만 생성.
+                    - [이미 제출한 추가질문]과 동일·유사한 질문은 **절대 생성 금지**.
                     """;
         } else {
             phaseExtra = """
                     - 집중분석 1차: 선택 카테고리·POS(CSV)·API 팩트 기반 핵심 공백을 넓게 파악.
-                    - 유사·중복으로 보이는 질문도 **제거하지 말고** 모두 포함.
+                    - [이미 제출한 추가질문]과 동일·유사한 질문은 **절대 생성 금지**.
                     """;
         }
 
@@ -197,7 +197,7 @@ final class ExistingOwnerPromptBuilder {
                 - category 필드는 반드시 "%s".
                 - isAnswerSufficient는 항상 false.
                 - CSV·answers에 이미 있는 수치는 다시 묻지 말 것.
-                - 질문 간 주제가 겹쳐도 괜찮음(중복 허용).
+                - 질문 간 주제·표현이 겹치는 **중복 질문 금지**.
                 %s
                 """.formatted(
                 category, phaseLabel, ctx, priorBlock, ragHint,
@@ -240,6 +240,7 @@ final class ExistingOwnerPromptBuilder {
                 - 모든 question의 category는 반드시 "%s".
                 - isAnswerSufficient는 항상 false.
                 - 이미 제출한 추가질문·CSV에 있는 정보는 다시 묻지 말 것.
+                - [이미 제출한 추가질문]과 동일·유사한 질문은 **절대 생성 금지**.
                 - 매장 상태를 확실히 파악할 수 있는 **구체적** 질문만.
                 """.formatted(category, ctx, priorBlock, ragHint, category, category, category).strip();
     }

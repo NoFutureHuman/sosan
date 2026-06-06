@@ -20,10 +20,10 @@ class ExistingOwnerReportNode implements AsyncNodeAction<ExistingOwnerGraphState
     @Override
     public CompletableFuture<Map<String, Object>> apply(ExistingOwnerGraphState state) {
         return CompletableFuture.supplyAsync(() -> {
-            Map<String, Object> parsed = openAiClient.invokeJson(
+                    Map<String, Object> parsed = openAiClient.invokeJson(
                     ExistingOwnerPromptBuilder.buildReportPrompt(state),
                     "REPORT",
-                    4800
+                    5200
             );
             if ("existing".equals(state.flowType().orElse("new"))) {
                 List<String> categories = state.selectedCategories().orElse(List.of());
