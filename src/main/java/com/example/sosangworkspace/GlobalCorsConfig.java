@@ -16,8 +16,8 @@ public class GlobalCorsConfig {
 
         // 프론트엔드 완벽 허용
         config.setAllowCredentials(true);
-        config.addAllowedOrigin("http://localhost:5173");
-        config.addAllowedOrigin("http://127.0.0.1:5173");
+        config.addAllowedOriginPattern("http://localhost:*");
+        config.addAllowedOriginPattern("http://127.0.0.1:*");
         config.addAllowedHeader("*");
         config.addAllowedMethod("*");
 
