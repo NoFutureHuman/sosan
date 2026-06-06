@@ -76,7 +76,7 @@ export function LandingPage() {
               boxShadow: "0 4px 14px rgba(16,185,129,0.35)",
             }}
           >
-            무료 시작
+            {loggedIn ? "마이페이지" : "무료 시작"}
           </button>
         </div>
       </nav>

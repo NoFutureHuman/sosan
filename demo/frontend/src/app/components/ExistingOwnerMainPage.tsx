@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { MarketPrice } from "./MarketPrice";
 import { DxTools } from "./DxTools";
+import { useAuthStatus } from "../hooks/useAuthStatus";
 
 const PAGE_BG = {
   background:
@@ -27,8 +28,9 @@ const PAGE_BG = {
 
 export function ExistingOwnerMainPage() {
   const navigate = useNavigate();
+  const { user } = useAuthStatus();
   const [activeView, setActiveView] = useState<"dashboard" | "market-price" | "tools">("dashboard");
-  const ownerName = "검색수 사장님";
+  const ownerName = user?.name ? `${user.name} 사장님` : "사장님";
 
   const serviceCards = [
     {

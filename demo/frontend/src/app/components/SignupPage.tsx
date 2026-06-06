@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router";
+import { useAuthStatus } from "../hooks/useAuthStatus";
 import {
   Store, ArrowRight, ChevronLeft,
   FileText, Users, Wrench, TrendingUp, ShoppingCart,
@@ -62,6 +63,10 @@ const stats = [
 
 export function SignupPage() {
   const navigate = useNavigate();
+  const { loggedIn } = useAuthStatus();
+  const startPath = loggedIn ? "/mypage" : "/register";
+  const startLabel = loggedIn ? "마이페이지" : "무료 가입";
+  const ctaLabel = loggedIn ? "마이페이지" : "무료로 시작하기";
 
   return (
     <div style={{ background: "#141720", minHeight: "100vh", color: "white" }}>
@@ -92,7 +97,7 @@ export function SignupPage() {
         </div>
 
         <button
-          onClick={() => navigate("/register")}
+          onClick={() => navigate(startPath)}
           className="flex items-center gap-1.5 px-4 h-9 rounded-lg transition-all"
           style={{
             background: "rgba(16,185,129,0.15)", color: "#10b981",
@@ -101,7 +106,7 @@ export function SignupPage() {
           onMouseEnter={e => (e.currentTarget.style.background = "rgba(16,185,129,0.25)")}
           onMouseLeave={e => (e.currentTarget.style.background = "rgba(16,185,129,0.15)")}
         >
-          무료 가입
+          {startLabel}
         </button>
       </header>
 
@@ -290,7 +295,7 @@ export function SignupPage() {
           >로그인 하나로 서비스를&nbsp;&nbsp;이용할 수 있어요.<br />사장님의 성장을 소상광장이 함께 응원합니다.</p>
 
           <button
-            onClick={() => navigate("/register")}
+            onClick={() => navigate(startPath)}
             className="flex items-center justify-center gap-2 mx-auto transition-all active:scale-[0.98]"
             style={{
               height: "60px", paddingLeft: "40px", paddingRight: "40px",
@@ -303,7 +308,7 @@ export function SignupPage() {
             onMouseEnter={e => (e.currentTarget.style.boxShadow = "0 14px 46px rgba(16,185,129,0.65)")}
             onMouseLeave={e => (e.currentTarget.style.boxShadow = "0 10px 36px rgba(16,185,129,0.48)")}
           >
-            무료로 시작하기 <ArrowRight className="w-5 h-5" />
+            {ctaLabel} <ArrowRight className="w-5 h-5" />
           </button>
 
           <div
