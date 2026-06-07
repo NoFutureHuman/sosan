@@ -26,7 +26,7 @@ import {
   fetchMyHistory,
   getStoredUser,
 } from "../utils/auth";
-import { getCommunityActivity } from "../utils/communityStorage";
+import { deleteUserComment, deleteUserPost, getCommunityActivity } from "../utils/communityStorage";
 
 const businessLabels: Record<string, string> = {
   food: "외식업",
@@ -94,6 +94,18 @@ export function MyPage() {
     } finally {
       setDeletingId(null);
     }
+  };
+
+  const handleDeleteCommunityPost = (postId: number) => {
+    if (!window.confirm("이 게시글을 삭제할까요?")) return;
+    if (!deleteUserPost(postId, user?.email)) return;
+    setCommunity(getCommunityActivity(user?.email));
+  };
+
+  const handleDeleteCommunityComment = (commentId: string) => {
+    if (!window.confirm("이 댓글을 삭제할까요?")) return;
+    if (!deleteUserComment(commentId, user?.email)) return;
+    setCommunity(getCommunityActivity(user?.email));
   };
 
   const handleLogout = () => {
@@ -369,21 +381,55 @@ export function MyPage() {
                 community.posts.map((post) => (
                   <li
                     key={post.id}
-                    className="px-4 py-3 border-b border-white/5 last:border-0"
+                    className="px-4 py-3 border-b border-white/5 last:border-0 flex items-center justify-between gap-3"
                   >
-                    <p className="text-white text-sm font-medium truncate">{post.title}</p>
-                    <p className="text-xs mt-1" style={{ color: "rgba(255,255,255,0.35)" }}>
-                      {post.category} · {formatWhen(post.date)}
-                    </p>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-white text-sm font-medium truncate">{post.title}</p>
+                      <p className="text-xs mt-1" style={{ color: "rgba(255,255,255,0.35)" }}>
+                        {post.category} · {formatWhen(post.date)}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteCommunityPost(post.id)}
+                      title="삭제"
+                      aria-label="게시글 삭제"
+                      className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 transition-colors"
+                      style={{
+                        background: "rgba(239,68,68,0.1)",
+                        border: "1px solid rgba(239,68,68,0.2)",
+                        color: "#fca5a5",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </li>
                 ))}
               {communityTab === "comments" &&
                 community.comments.map((c) => (
-                  <li key={c.id} className="px-4 py-3 border-b border-white/5 last:border-0">
-                    <p className="text-white text-sm line-clamp-2">{c.content}</p>
-                    <p className="text-xs mt-1 truncate" style={{ color: "rgba(255,255,255,0.35)" }}>
-                      {c.postTitle} · {formatWhen(c.createdAt)}
-                    </p>
+                  <li key={c.id} className="px-4 py-3 border-b border-white/5 last:border-0 flex items-center justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-white text-sm line-clamp-2">{c.content}</p>
+                      <p className="text-xs mt-1 truncate" style={{ color: "rgba(255,255,255,0.35)" }}>
+                        {c.postTitle} · {formatWhen(c.createdAt)}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteCommunityComment(c.id)}
+                      title="삭제"
+                      aria-label="댓글 삭제"
+                      className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 transition-colors"
+                      style={{
+                        background: "rgba(239,68,68,0.1)",
+                        border: "1px solid rgba(239,68,68,0.2)",
+                        color: "#fca5a5",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </li>
                 ))}
               {communityTab === "likes" &&
