@@ -54,3 +54,6 @@ langgraph_service/
 
 sosan-main/build/
 demo/frontend/dist/
+
+# 로컬 H2 파일 DB (bootRun -Pdev)
+.data/

@@ -120,9 +120,8 @@ export function SignupPage() {
           className="mb-6"
           style={{ fontSize: "70px", fontWeight: 800, lineHeight: 1.12, letterSpacing: "-0.04em", maxWidth: "720px" }}
         >
-          소상공인을 위한<br />
           <span style={{ background: "linear-gradient(135deg, #10b981, #34d399)", WebkitBackgroundClip: "text", backgroundClip: "text", WebkitTextFillColor: "transparent", color: "transparent", display: "inline-block" }}>
-            종합 비즈니스 플랫폼
+            NOVA
           </span>
         </h1>
 

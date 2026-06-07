@@ -32,123 +32,24 @@ interface MarketItem {
   image: string; seller: string; desc: string;
 }
 
-const mockItems: MarketItem[] = [
-  {
-    id: 1, title: "업소용 4구 가스레인지", price: 180000,
-    location: "서울 마포구", condition: "중고", category: "주방기기", posted: "1시간 전",
-    views: 87, chats: 3, likes: 9,
-    image: "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=600&q=80",
-    seller: "마포사장님", desc: "2년 사용. 화력 이상 없음. 직접 가져가실 분만 연락주세요. 매장 리모델링으로 판매합니다.",
-  },
-  {
-    id: 2, title: "업무용 45박스 냉장고 (유니크)", price: 750000,
-    location: "서울 강남구", condition: "중고", category: "냉장/냉동", posted: "3시간 전",
-    views: 214, chats: 7, likes: 18,
-    image: "https://images.unsplash.com/photo-1584568694244-14fbdf83bd30?w=600&q=80",
-    seller: "강남식당", desc: "1년 6개월 사용. 냉장 온도 정상. 외관 스크래치 약간 있음. 폐업으로 급매합니다.",
-  },
-  {
-    id: 3, title: "카페 2인 테이블 + 의자 세트 (4조)", price: 280000,
-    location: "경기 성남시", condition: "중고", category: "테이블/의자", posted: "5시간 전",
-    views: 143, chats: 4, likes: 11,
-    image: "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=600&q=80",
-    seller: "성남카페", desc: "카페 인테리어 변경으로 판매. 테이블 4개 + 의자 8개 세트. 상태 양호합니다.",
-  },
-  {
-    id: 4, title: "키오스크형 포스기 + 영수증 프린터", price: 320000,
-    location: "경기 수원시", condition: "중고", category: "포스/결제", posted: "어제",
-    views: 389, chats: 9, likes: 24,
-    image: "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=600&q=80",
-    seller: "수원치킨", desc: "2024년 구매. 프로그램 초기화 완료. 터치스크린 정상. 영수증 프린터 포함.",
-  },
-  {
-    id: 5, title: "빈티지 카페 펜던트 조명 6개 세트", price: 95000,
-    location: "서울 홍대", condition: "중고", category: "인테리어", posted: "어제",
-    views: 201, chats: 5, likes: 33,
-    image: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=600&q=80",
-    seller: "홍대카페사장", desc: "카페 리뉴얼로 교체. 에디슨 전구 포함. 감성 인테리어 원하시는 분께 추천.",
-  },
-  {
-    id: 6, title: "LED 채널 간판 (800 x 300)", price: 140000,
-    location: "부산 해운대구", condition: "새상품", category: "간판/사인", posted: "2일 전",
-    views: 76, chats: 2, likes: 5,
-    image: "https://images.unsplash.com/photo-1567521464027-f127ff144326?w=600&q=80",
-    seller: "부산간판", desc: "미사용 재고 처분. 전구 정상. 원하는 문구로 제작 가능 (별도 비용).",
-  },
-  {
-    id: 7, title: "아이스크림 쇼케이스 냉동고", price: 450000,
-    location: "서울 종로구", condition: "중고", category: "냉장/냉동", posted: "2일 전",
-    views: 165, chats: 6, likes: 14,
-    image: "https://images.unsplash.com/photo-1581859814946-abff06781e7e?w=600&q=80",
-    seller: "종로분식", desc: "3년 사용. 냉동 기능 정상. 업종 변경으로 판매. 직거래만 가능합니다.",
-  },
-  {
-    id: 8, title: "업소용 앞치마 30벌 (새상품)", price: 45000,
-    location: "인천 부평구", condition: "새상품", category: "기타", posted: "3일 전",
-    views: 52, chats: 1, likes: 3,
-    image: "https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=600&q=80",
-    seller: "인천식당", desc: "사이즈 잘못 주문한 새상품 재고. 프리사이즈. 단체 구매 할인 가능.",
-  },
-];
+const mockItems: MarketItem[] = [];
 
 interface SharingItem {
   id: number; title: string; category: string; condition: "중고" | "새상품";
   location: string; posted: string; image: string; seller: string; desc: string;
 }
 
-const sharingItems: SharingItem[] = [
-  {
-    id: 101,
-    title: "업소용 냄비 세트 (대·중·소) 나눔합니다",
-    category: "주방기기",
-    condition: "중고",
-    location: "서울 강서구",
-    posted: "2시간 전",
-    image: "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=600&q=80",
-    seller: "강서분식사장",
-    desc: "가게 리모델링으로 안 쓰는 냄비 세트 나눔합니다. 사용감 있지만 기능 이상 없어요. 직접 가져가실 분만요.",
-  },
-  {
-    id: 102,
-    title: "카페 의자 4개 무료 나눔 (인테리어 교체)",
-    category: "테이블/의자",
-    condition: "중고",
-    location: "서울 홍대",
-    posted: "5시간 전",
-    image: "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=600&q=80",
-    seller: "홍대카페사장",
-    desc: "인테리어 변경으로 기존 의자 나눔합니다. 4개 세트로만 드려요. 외관 스크래치 조금 있습니다.",
-  },
-  {
-    id: 103,
-    title: "업소용 앞치마 20벌 나눔 (미사용 재고)",
-    category: "기타",
-    condition: "새상품",
-    location: "경기 성남시",
-    posted: "1일 전",
-    image: "https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=600&q=80",
-    seller: "성남식당사장",
-    desc: "사이즈 잘못 주문한 새상품 앞치마입니다. 프리사이즈 20벌 전량 나눔. 필요하신 분 가져가세요.",
-  },
-  {
-    id: 104,
-    title: "포스기 영수증 용지 10롤 나눔",
-    category: "포스/결제",
-    condition: "새상품",
-    location: "부산 해운대구",
-    posted: "2일 전",
-    image: "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=600&q=80",
-    seller: "해운대치킨",
-    desc: "폐업으로 남은 영수증 용지 10롤 나눔합니다. 미개봉 새상품입니다. 포스기 쓰시는 분 가져가세요.",
-  },
-];
+const sharingItems: SharingItem[] = [];
 
-const groupBuyItems = [
-  { id: 201, title: "로컬 유기농 쌀 공동구매 (10kg)", participants: 18, target: 30, price: "32,000원", originalPrice: "45,000원", deadline: "2026.03.05" },
-  { id: 202, title: "친환경 종이 포장용기 공동구매", participants: 12, target: 20, price: "15,000원/500개", originalPrice: "22,000원/500개", deadline: "2026.03.10" },
-  { id: 203, title: "업소용 막걸리 공동구매 (20병)", participants: 22, target: 25, price: "48,000원/20병", originalPrice: "65,000원/20병", deadline: "2026.03.03" },
-  { id: 204, title: "국산 한우 등심 공동구매", participants: 8, target: 15, price: "85,000원/kg", originalPrice: "120,000원/kg", deadline: "2026.03.12" },
-];
+const groupBuyItems: {
+  id: number;
+  title: string;
+  participants: number;
+  target: number;
+  price: string;
+  originalPrice: string;
+  deadline: string;
+}[] = [];
 
 export function Marketplace() {
   const [tab, setTab] = useState("trade");
@@ -547,6 +448,13 @@ export function Marketplace() {
             </CardContent>
           </Card>
 
+          {groupBuyItems.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <ShoppingBag className="w-12 h-12 text-gray-600 mb-4" />
+              <p className="text-gray-400" style={{ fontSize: "0.95rem", fontWeight: 600 }}>진행 중인 공동구매가 없습니다</p>
+              <p className="text-gray-600 mt-1" style={{ fontSize: "0.82rem" }}>새 공동구매가 등록되면 여기에 표시됩니다</p>
+            </div>
+          )}
           {groupBuyItems.map((item) => (
             <Card key={item.id} className="border-border/60 hover:shadow-md transition-shadow">
               <CardContent className="p-5">
@@ -590,6 +498,13 @@ export function Marketplace() {
             </CardContent>
           </Card>
 
+          {sharingItems.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <Gift className="w-12 h-12 text-gray-600 mb-4" />
+              <p className="text-gray-400" style={{ fontSize: "0.95rem", fontWeight: 600 }}>등록된 나눔 물품이 없습니다</p>
+              <p className="text-gray-600 mt-1" style={{ fontSize: "0.82rem" }}>첫 번째로 나눔 물품을 등록해보세요</p>
+            </div>
+          )}
           {sharingItems.map((item) => (
             <Card key={item.id} className="border-border/60 hover:shadow-md transition-shadow">
               <CardContent className="p-5">

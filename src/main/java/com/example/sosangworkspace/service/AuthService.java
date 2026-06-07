@@ -23,6 +23,7 @@ public class AuthService {
 
     private final UserRepository userRepository;
     private final AnalysisHistoryRepository historyRepository;
+    private final AnalysisHistorySaver historySaver;
     private final JwtService jwtService;
     private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -67,6 +68,46 @@ public class AuthService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."));
         return toUserMap(user);
+    }
+
+    @Transactional
+    public Map<String, Object> saveNewStartupHistory(Long userId, Map<String, Object> body) {
+        Object reportRaw = body.get("report");
+        if (reportRaw == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "저장할 분석 결과가 없습니다.");
+        }
+        String reportJson = String.valueOf(reportRaw).trim();
+        if (reportJson.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "저장할 분석 결과가 없습니다.");
+        }
+
+        Map<String, String> answers = new LinkedHashMap<>();
+        Object answersRaw = body.get("answers");
+        if (answersRaw instanceof Map<?, ?> map) {
+            map.forEach((k, v) -> {
+                if (k != null && v != null) {
+                    String text = String.valueOf(v).trim();
+                    if (!text.isEmpty() && !"null".equalsIgnoreCase(text)) {
+                        answers.put(String.valueOf(k), text);
+                    }
+                }
+            });
+        }
+
+        Long historyId = historySaver.saveNewStartupReport(answers, reportJson, userId);
+        if (historyId == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.INTERNAL_SERVER_ERROR, "분석 기록을 저장하지 못했습니다.");
+        }
+        return Map.of("historyId", historyId);
+    }
+
+    @Transactional
+    public void deleteAnalysisHistory(Long userId, Long historyId) {
+        AnalysisHistory history = historyRepository.findByIdAndUserId(historyId, userId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "분석 기록을 찾을 수 없습니다."));
+        historyRepository.delete(history);
     }
 
     public List<Map<String, Object>> getMyAnalysisHistory(Long userId) {

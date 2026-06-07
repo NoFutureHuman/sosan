@@ -1,5 +1,5 @@
     import { useState, useEffect, useMemo, useRef } from "react";
-    import { Link, useSearchParams } from "react-router";
+    import { Link, useNavigate, useSearchParams } from "react-router";
     import type { AiAnalysisResult } from "../utils/openai";
     import {
         Store,
@@ -20,13 +20,16 @@
         type RegionAddressValue,
     } from "./DetailedStartupQuestionnaire";
     import {
-        ExistingOwnerAnalysisModeSelectView,
         ExistingOwnerEntryView,
         ExistingOwnerFlowViews,
     } from "./ExistingOwner";
-    import { ExistingOwnerMainPage } from "./ExistingOwnerMainPage";
     import { motion, AnimatePresence } from "framer-motion";
-    import { authHeaders } from "../utils/auth";
+    import {
+        authHeaders,
+        isLoggedIn,
+        saveNewAnalysisHistory,
+        storePendingNewAnalysis,
+    } from "../utils/auth";
     import {
         fetchExistingOwnerApiBundle,
         type CommercialContext,
@@ -991,6 +994,7 @@
     };
     
     export function AIAnalysisPage() {
+        const navigate = useNavigate();
         const [searchParams] = useSearchParams();
         const [flow, setFlow] = useState<FlowState>("typeSelect");
         const [analysisMode, setAnalysisMode] = useState<AnalysisMode>("light");
@@ -1000,15 +1004,13 @@
         useEffect(() => {
             const view = searchParams.get("view");
             if (view === "ownerMain") {
-                setUserType("existing");
-                setAnalysisMode("light");
-                setFlow("ownerMain");
+                navigate("/owner", { replace: true });
             } else if (view === "existing") {
                 setUserType("existing");
                 setAnalysisMode("light");
                 setFlow("existingEntry");
             }
-        }, [searchParams]);
+        }, [searchParams, navigate]);
     
         // 상태 및 헬퍼 함수
         const [answers, setAnswers] = useState<Record<string, string | string[]>>({});
@@ -1536,12 +1538,25 @@
                 body: JSON.stringify({ ...answersRef.current, _userType: "new" }),
             })
                 .then((r) => r.json())
-                .then((data) => {
+                .then(async (data) => {
                     if (cancelled) return;
                     if (data.report) {
                         try {
                             setNewAiResult(JSON.parse(data.report) as AiAnalysisResult);
                             setAiError(false);
+                            if (!data.historyId) {
+                                if (isLoggedIn()) {
+                                    await saveNewAnalysisHistory(
+                                        answersRef.current,
+                                        data.report,
+                                    );
+                                } else {
+                                    storePendingNewAnalysis(
+                                        answersRef.current,
+                                        data.report,
+                                    );
+                                }
+                            }
                         } catch {
                             setAiError(true);
                             setNewAiResult(null);
@@ -1710,7 +1725,11 @@
             return (
                 <ExistingOwnerEntryView
                     onBack={() => setFlow("typeSelect")}
-                    onStartAnalysis={() => setFlow("analysisModeSelect")}
+                    onStartAnalysis={() => {
+                        setAnalysisMode("light");
+                        setAnswers((prev) => ({ ...prev, analysisMode: "light" }));
+                        setFlow("existingNotice");
+                    }}
                     expanded={existingEntryExpanded}
                     onToggleExpanded={(title) =>
                         setExistingEntryExpanded((prev) =>
@@ -1719,22 +1738,6 @@
                                 : [...prev, title],
                         )
                     }
-                    pageBgStyle={PAGE_BG}
-                />
-            );
-        }
-    
-        if (flow === "analysisModeSelect") {
-            return (
-                <ExistingOwnerAnalysisModeSelectView
-                    onBack={() =>
-                        setFlow(userType === "existing" ? "existingEntry" : "typeSelect")
-                    }
-                    onSelectMode={(mode) => {
-                        setAnalysisMode(mode);
-                        setAnswers((prev) => ({ ...prev, analysisMode: mode }));
-                        setFlow("existingNotice");
-                    }}
                     pageBgStyle={PAGE_BG}
                 />
             );
@@ -1870,9 +1873,6 @@
             setFlow("existingEntry");
         };
         const handleSwitchToExisting = () => startFlow("existing");
-        if (flow === "ownerMain") {
-            return <ExistingOwnerMainPage />;
-        }
         if (flow === "result" && userType === "existing")
             return (
                 <ExistingResultReport
@@ -1883,7 +1883,7 @@
                     sbizData={sbizData}
                     kamisData={kamisData}
                     onReset={handleExistingMain}
-                    onGoMain={() => setFlow("ownerMain")}
+                    onGoMain={() => navigate("/owner")}
                     selectedCategories={
                         analysisMode === "deep"
                             ? selectedDeepCategories
@@ -2148,11 +2148,7 @@
                 <div style={PAGE_BG}>
                     <div style={{ maxWidth: 760, margin: "0 auto", padding: "32px 20px" }}>
                         <TopBar
-                            onBack={() =>
-                                setFlow(
-                                    analysisMode === "deep" ? "deepQuestions" : "existingQuestions",
-                                )
-                            }
+                            onBack={() => setFlow("existingQuestions")}
                             label="추가 확인 질문"
                         />
                         <div
@@ -2180,7 +2176,7 @@
                         </h2>
                         <p style={{ color: "rgba(255,255,255,0.45)", marginBottom: "20px" }}>
                             아래 질문은 고정질문 응답과 API 데이터 기반으로 생성되었습니다. (
-                            {analysisMode === "deep" ? "집중분석" : "가벼운 분석"} ·{" "}
+                            가벼운 분석 ·{" "}
                             {followupCategoryPageRound}차 추가질문 · 질문{" "}
                             {followupQuestions.length}개 · 선택 카테고리{" "}
                             {batchFollowupCategories.length}개)

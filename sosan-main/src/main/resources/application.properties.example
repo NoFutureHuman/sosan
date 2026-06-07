@@ -7,6 +7,7 @@ openai.api.key=
 api.key.nts=
 api.key.kamis=
 api.key.smes=
+api.key.bizinfo=
 api.key.molit=
 api.key.semas=
 api.key.reb=
@@ -15,8 +16,10 @@ molit.api.key=${api.key.molit}
 sbiz.api.key=${api.key.semas:}
 rone.api.key=${api.key.reb}
 smes.api.key=${api.key.smes}
+bizinfo.api.key=${api.key.bizinfo:${api.key.smes}}
 nts.api.key=${api.key.nts}
 kamis.api.key=${api.key.kamis}
+kamis.api.cert-id=2024
 
 spring.datasource.url=jdbc:mysql://${DB_HOST:localhost}:3306/sosang_db?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=Asia/Seoul&characterEncoding=UTF-8&allowPublicKeyRetrieval=true
 spring.datasource.username=${DB_USERNAME:root}

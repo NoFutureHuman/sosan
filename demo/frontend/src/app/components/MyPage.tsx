@@ -13,6 +13,7 @@ import {
   ThumbsUp,
   MessageSquare,
   FileText,
+  Trash2,
   Users,
 } from "lucide-react";
 import {
@@ -20,6 +21,7 @@ import {
   AUTH_CHANGE_EVENT,
   AuthUser,
   clearAuthSession,
+  deleteAnalysisHistory,
   fetchMe,
   fetchMyHistory,
   getStoredUser,
@@ -53,9 +55,17 @@ export function MyPage() {
   const [communityTab, setCommunityTab] = useState<CommunityTab>("posts");
   const [community, setCommunity] = useState(() => getCommunityActivity());
   const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+
+  const loadHistory = () => {
+    fetchMyHistory()
+      .then(setHistory)
+      .catch(() => setHistory([]));
+  };
 
   const loadAll = () => {
     setCommunity(getCommunityActivity(user?.email));
+    loadHistory();
   };
 
   useEffect(() => {
@@ -72,6 +82,19 @@ export function MyPage() {
     window.addEventListener(AUTH_CHANGE_EVENT, onAuthChange);
     return () => window.removeEventListener(AUTH_CHANGE_EVENT, onAuthChange);
   }, [navigate]);
+
+  const handleDeleteHistory = async (id: number) => {
+    if (!window.confirm("이 분석 기록을 삭제할까요?")) return;
+    setDeletingId(id);
+    try {
+      await deleteAnalysisHistory(id);
+      setHistory((prev) => prev.filter((item) => item.id !== id));
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : "삭제에 실패했습니다.");
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   const handleLogout = () => {
     clearAuthSession();
@@ -126,7 +149,7 @@ export function MyPage() {
           className="text-white mb-1"
           style={{ fontSize: "1.75rem", fontWeight: 800, letterSpacing: "-0.04em" }}
         >
-          안녕하세요, {user?.name || "사장님"}!
+          안녕하세요 {user?.name?.trim() ? `${user.name.trim()}님` : "사장님"}!
         </h1>
         <p className="mb-8" style={{ fontSize: "0.9rem", color: "rgba(255,255,255,0.42)" }}>
           내 정보, 서비스 바로가기, 분석·커뮤니티 활동을 한곳에서 확인해요.
@@ -163,7 +186,7 @@ export function MyPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-8">
           <button
             type="button"
-            onClick={() => navigate("/ai-analysis?view=ownerMain")}
+            onClick={() => navigate("/owner")}
             className="flex items-center justify-between px-4 py-4 rounded-2xl text-left transition-all"
             style={{
               ...cardStyle,
@@ -210,7 +233,7 @@ export function MyPage() {
           완료된 분석 기록
         </h2>
         <p className="mb-4" style={{ fontSize: "0.82rem", color: "rgba(255,255,255,0.35)" }}>
-          항목을 누르면 저장된 리포트를 다시 볼 수 있어요.
+          항목을 누르면 저장된 리포트를 다시 볼 수 있어요. 휴지통으로 삭제할 수 있습니다.
         </p>
 
         {history.length === 0 ? (
@@ -229,13 +252,16 @@ export function MyPage() {
           <ul className="space-y-3 mb-8">
             {history.map((item) => (
               <li key={item.id}>
-                <button
-                  type="button"
-                  onClick={() => navigate(`/mypage/history/${item.id}`)}
-                  className="w-full rounded-xl px-4 py-3 flex items-center justify-between gap-3 text-left transition-all"
-                  style={{ ...cardStyle, cursor: "pointer" }}
+                <div
+                  className="w-full rounded-xl px-4 py-3 flex items-center justify-between gap-3"
+                  style={cardStyle}
                 >
-                  <div className="min-w-0">
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/mypage/history/${item.id}`)}
+                    className="min-w-0 flex-1 text-left"
+                    style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}
+                  >
                     <p className="text-white text-sm font-medium truncate">
                       {item.userType === "EXISTING" ? "기존 사장님" : "신생 창업자"} ·{" "}
                       {item.businessType || "업종 미입력"}
@@ -248,9 +274,42 @@ export function MyPage() {
                       {item.createdAt?.slice(0, 16).replace("T", " ")}
                       {item.region ? ` · ${item.region}` : ""}
                     </p>
+                  </button>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteHistory(item.id)}
+                      disabled={deletingId === item.id}
+                      title="삭제"
+                      aria-label="분석 기록 삭제"
+                      className="w-9 h-9 rounded-lg flex items-center justify-center transition-colors"
+                      style={{
+                        background: "rgba(239,68,68,0.1)",
+                        border: "1px solid rgba(239,68,68,0.2)",
+                        color: "#fca5a5",
+                        cursor: deletingId === item.id ? "not-allowed" : "pointer",
+                        opacity: deletingId === item.id ? 0.5 : 1,
+                      }}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/mypage/history/${item.id}`)}
+                      title="보기"
+                      aria-label="분석 기록 보기"
+                      className="w-9 h-9 rounded-lg flex items-center justify-center"
+                      style={{
+                        background: "rgba(16,185,129,0.1)",
+                        border: "1px solid rgba(16,185,129,0.2)",
+                        color: "#34d399",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <ChevronRight className="w-5 h-5" />
+                    </button>
                   </div>
-                  <ChevronRight className="w-5 h-5 shrink-0" style={{ color: "#34d399" }} />
-                </button>
+                </div>
               </li>
             ))}
           </ul>
@@ -262,7 +321,7 @@ export function MyPage() {
           </h2>
           <button
             type="button"
-            onClick={() => navigate("/community")}
+            onClick={() => navigate("/owner?tab=community")}
             className="text-xs flex items-center gap-1"
             style={{ color: "#34d399", background: "none", border: "none", cursor: "pointer" }}
           >

@@ -8,20 +8,33 @@ export type AuthUser = {
 
 const TOKEN_KEY = "sosang_access_token";
 const USER_KEY = "sosang_user";
+const authStorage = sessionStorage;
 
-export function getApiBase(): string {
-  return (
-    (import.meta.env.VITE_API_BASE as string | undefined)?.replace(/\/$/, "") ||
-    "http://localhost:8081"
-  );
+function clearLegacyAuthStorage(): void {
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(USER_KEY);
+  localStorage.removeItem("isLoggedIn");
 }
 
+clearLegacyAuthStorage();
+
+export function getApiBase(): string {
+  const env = import.meta.env.VITE_API_BASE as string | undefined;
+  if (env === "") return "";
+  if (env) return env.replace(/\/$/, "");
+  if (import.meta.env.DEV) return "";
+  return "http://localhost:8081";
+}
+
+const BACKEND_UNAVAILABLE_MESSAGE =
+  "백엔드 서버에 연결할 수 없습니다. sosnag12312123-main 폴더에서 .\\gradlew.bat bootRun -Pdev 로 서버(8081)를 실행해 주세요.";
+
 export function getAccessToken(): string | null {
-  return localStorage.getItem(TOKEN_KEY);
+  return authStorage.getItem(TOKEN_KEY);
 }
 
 export function getStoredUser(): AuthUser | null {
-  const raw = localStorage.getItem(USER_KEY);
+  const raw = authStorage.getItem(USER_KEY);
   if (!raw) return null;
   try {
     return JSON.parse(raw) as AuthUser;
@@ -40,17 +53,18 @@ export function notifyAuthChange(): void {
   window.dispatchEvent(new Event(AUTH_CHANGE_EVENT));
 }
 
+const PENDING_NEW_ANALYSIS_KEY = "sosang_pending_new_analysis";
+
 export function setAuthSession(accessToken: string, user: AuthUser): void {
-  localStorage.setItem(TOKEN_KEY, accessToken);
-  localStorage.setItem(USER_KEY, JSON.stringify(user));
-  localStorage.setItem("isLoggedIn", "true");
+  authStorage.setItem(TOKEN_KEY, accessToken);
+  authStorage.setItem(USER_KEY, JSON.stringify(user));
   notifyAuthChange();
+  void syncPendingNewAnalysis();
 }
 
 export function clearAuthSession(): void {
-  localStorage.removeItem(TOKEN_KEY);
-  localStorage.removeItem(USER_KEY);
-  localStorage.removeItem("isLoggedIn");
+  authStorage.removeItem(TOKEN_KEY);
+  authStorage.removeItem(USER_KEY);
   notifyAuthChange();
 }
 
@@ -84,7 +98,11 @@ export function authHeaders(extra?: HeadersInit): HeadersInit {
 export async function authFetch(path: string, init?: RequestInit): Promise<Response> {
   const url = path.startsWith("http") ? path : `${getApiBase()}${path}`;
   const headers = authHeaders(init?.headers);
-  return fetch(url, { ...init, headers });
+  try {
+    return await fetch(url, { ...init, headers });
+  } catch {
+    throw new Error(BACKEND_UNAVAILABLE_MESSAGE);
+  }
 }
 
 export async function login(email: string, password: string): Promise<AuthUser> {
@@ -159,6 +177,54 @@ export type AnalysisHistoryItem = {
   createdAt: string;
 };
 
+export function storePendingNewAnalysis(
+  answers: Record<string, string | string[]>,
+  report: string,
+): void {
+  authStorage.setItem(
+    PENDING_NEW_ANALYSIS_KEY,
+    JSON.stringify({ answers, report }),
+  );
+}
+
+export async function saveNewAnalysisHistory(
+  answers: Record<string, string | string[]>,
+  report: string,
+): Promise<number | null> {
+  const res = await authFetch("/api/auth/me/history/new", {
+    method: "POST",
+    body: JSON.stringify({ answers, report }),
+  });
+  if (!res.ok) {
+    return null;
+  }
+  const data = (await res.json()) as { historyId?: number };
+  notifyAuthChange();
+  return data.historyId ?? null;
+}
+
+export async function syncPendingNewAnalysis(): Promise<void> {
+  if (!isLoggedIn()) return;
+  const raw = authStorage.getItem(PENDING_NEW_ANALYSIS_KEY);
+  if (!raw) return;
+  try {
+    const pending = JSON.parse(raw) as {
+      answers: Record<string, string | string[]>;
+      report: string;
+    };
+    if (!pending?.report) return;
+    const historyId = await saveNewAnalysisHistory(
+      pending.answers ?? {},
+      pending.report,
+    );
+    if (historyId != null) {
+      authStorage.removeItem(PENDING_NEW_ANALYSIS_KEY);
+    }
+  } catch {
+    /* 다음 로그인 시 재시도 */
+  }
+}
+
 export async function fetchMyHistory(): Promise<AnalysisHistoryItem[]> {
   const res = await authFetch("/api/auth/me/history");
   if (!res.ok) {
@@ -178,6 +244,23 @@ function authApiUnavailableMessage(raw: string): string {
     return "백엔드가 최신 버전이 아닙니다. sosan-main 폴더에서 gradlew bootRun으로 서버(8081)를 다시 실행해 주세요.";
   }
   return raw;
+}
+
+export async function deleteAnalysisHistory(historyId: number): Promise<void> {
+  const res = await authFetch(`/api/auth/me/history/${historyId}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) {
+    let message = "분석 기록을 삭제하지 못했습니다.";
+    try {
+      const err = await res.json();
+      if (typeof err.message === "string") message = authApiUnavailableMessage(err.message);
+    } catch {
+      /* ignore */
+    }
+    throw new Error(message);
+  }
+  notifyAuthChange();
 }
 
 export async function fetchHistoryDetail(historyId: number): Promise<AnalysisHistoryDetail> {

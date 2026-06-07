@@ -133,7 +133,7 @@ export function Community() {
         {[
           { label: "전체 게시글", value: boardPosts.length + "개", bg: "rgba(16,185,129,0.1)", color: "#10b981" },
           { label: "HOT 게시글", value: boardPosts.filter((p) => p.isHot).length + "개", bg: "rgba(239,68,68,0.1)", color: "#ef4444" },
-          { label: "오늘 활성 사장님", value: "2,341명", bg: "rgba(59,130,246,0.1)", color: "#60a5fa" },
+          { label: "참여 사장님", value: new Set(boardPosts.map((p) => p.author)).size + "명", bg: "rgba(59,130,246,0.1)", color: "#60a5fa" },
           { label: "내 공감 게시글", value: likedPosts.size + "개", bg: "rgba(245,158,11,0.1)", color: "#f59e0b" },
         ].map((stat) => (
           <div key={stat.label} className="rounded-xl p-4 text-center" style={{ background: stat.bg }}>
@@ -205,7 +205,7 @@ export function Community() {
             <Card className="mb-6 border-0 shadow-lg ring-1 ring-primary/10">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between mb-5">
-                  <h3 style={{ fontWeight: 600, fontSize: "1.02rem" }}>새 글 작성</h3>
+                  <h3 className="text-gray-900" style={{ fontWeight: 600, fontSize: "1.02rem" }}>새 글 작성</h3>
                   <button onClick={() => setShowWrite(false)} className="w-8 h-8 rounded-lg hover:bg-gray-100 flex items-center justify-center text-gray-400">
                     <X className="w-4 h-4" />
                   </button>
@@ -213,7 +213,7 @@ export function Community() {
                 <div className="space-y-4">
                   <div className="flex gap-3">
                     <select
-                      className="border border-gray-200 rounded-xl px-3.5 py-2.5 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40"
+                      className="border border-gray-200 rounded-xl px-3.5 py-2.5 bg-white text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40"
                       value={writeForm.category}
                       onChange={(e) => setWriteForm({ ...writeForm, category: e.target.value })}
                     >
@@ -225,11 +225,11 @@ export function Community() {
                       placeholder="제목을 입력하세요"
                       value={writeForm.title}
                       onChange={(e) => setWriteForm({ ...writeForm, title: e.target.value })}
-                      className="flex-1 h-11 rounded-xl border-gray-200"
+                      className="flex-1 h-11 rounded-xl border-gray-200 bg-white text-gray-900 placeholder:text-gray-400"
                     />
                   </div>
                   <textarea
-                    className="w-full border border-gray-200 rounded-xl p-4 min-h-[140px] text-sm bg-white resize-none focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 placeholder:text-gray-400"
+                    className="w-full border border-gray-200 rounded-xl p-4 min-h-[140px] text-sm bg-white text-gray-900 resize-none focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 placeholder:text-gray-400"
                     placeholder="다른 사장님들과 나누고 싶은 이야기를 자유롭게 적어주세요..."
                     value={writeForm.content}
                     onChange={(e) => setWriteForm({ ...writeForm, content: e.target.value })}
@@ -328,6 +328,13 @@ export function Community() {
             </div>
 
             {/* Table Rows */}
+            {filtered.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-16 text-center">
+                <MessageSquare className="w-12 h-12 text-gray-600 mb-4" />
+                <p className="text-gray-400" style={{ fontSize: "0.95rem", fontWeight: 600 }}>등록된 게시글이 없습니다</p>
+                <p className="text-gray-600 mt-1" style={{ fontSize: "0.82rem" }}>첫 번째 글을 작성해보세요</p>
+              </div>
+            )}
             {filtered.map((post) => (
               <div
                 key={post.id}

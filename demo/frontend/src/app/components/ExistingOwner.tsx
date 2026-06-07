@@ -1,5 +1,5 @@
 import React from "react";
-import { BadgeDollarSign, ChevronLeft, FileUp, Keyboard, Settings2, Sparkles, TrendingUp, Users } from "lucide-react";
+import { BadgeDollarSign, ChevronLeft, Settings2, Sparkles, TrendingUp, Users } from "lucide-react";
 import {
   formatRegionAddress,
   RegionAddressInput,
@@ -188,76 +188,6 @@ export function ExistingOwnerEntryView({
   );
 }
 
-type ExistingOwnerAnalysisModeSelectViewProps = {
-  onBack: () => void;
-  onSelectMode: (mode: AnalysisMode) => void;
-  pageBgStyle: React.CSSProperties;
-};
-
-export function ExistingOwnerAnalysisModeSelectView({
-  onBack,
-  onSelectMode,
-  pageBgStyle,
-}: ExistingOwnerAnalysisModeSelectViewProps) {
-  return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-6 py-16" style={{ ...pageBgStyle, position: "relative" }}>
-      <div className="w-full max-w-3xl">
-        <button
-          onClick={onBack}
-          className="flex items-center gap-1 text-sm font-medium mb-8"
-          style={{ color: "rgba(255,255,255,0.4)", background: "none", border: "none", cursor: "pointer" }}
-        >
-          <ChevronLeft className="w-4 h-4" /> 이전
-        </button>
-        <div className="flex justify-center mb-5">
-          <div
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-full"
-            style={{ background: "rgba(16,185,129,0.12)", border: "1px solid rgba(16,185,129,0.3)", fontSize: "0.8rem", fontWeight: 600, color: "#34d399" }}
-          >
-            <Sparkles style={{ width: "14px", height: "14px" }} />
-            분석 방식을 먼저 선택해주세요
-          </div>
-        </div>
-        <h1 className="text-center mb-3" style={{ fontSize: "clamp(1.9rem, 5vw, 3rem)", fontWeight: 800, letterSpacing: "-0.04em" }}>
-          어떤 분석이 필요하신가요?
-        </h1>
-        <p className="text-center mb-12" style={{ fontSize: "1rem", color: "rgba(255,255,255,0.4)" }}>
-          빠른 진단용 가벼운 분석과, POS 기반의 정밀한 집중분석 중에서 고를 수 있습니다.
-        </p>
-        <div className="grid sm:grid-cols-2 gap-5">
-          {[
-            {
-              key: "light" as AnalysisMode,
-              title: "가벼운 분석",
-              desc: "현재 운영 상태를 빠르게 진단해 핵심 개선 포인트를 제안합니다.",
-              icon: <Sparkles style={{ width: "22px", height: "22px" }} />,
-            },
-            {
-              key: "deep" as AnalysisMode,
-              title: "집중분석",
-              desc: "POS 매출 데이터와 세부 질문으로 실행 가능한 정밀 솔루션을 제공합니다. (데이터가 있으시다면 원활한 분석이 가능합니다)",
-              icon: <TrendingUp style={{ width: "22px", height: "22px" }} />,
-            },
-          ].map((card) => (
-            <button
-              key={card.key}
-              onClick={() => onSelectMode(card.key)}
-              className="text-left rounded-2xl p-7 transition-all active:scale-[0.98]"
-              style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", cursor: "pointer" }}
-            >
-              <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-5" style={{ background: "rgba(16,185,129,0.15)", color: "#34d399" }}>
-                {card.icon}
-              </div>
-              <h3 style={{ fontSize: "1.2rem", fontWeight: 800, marginBottom: "10px" }}>{card.title}</h3>
-              <p style={{ fontSize: "0.88rem", color: "rgba(255,255,255,0.45)", lineHeight: 1.7 }}>{card.desc}</p>
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 type ExistingOwnerFlowViewsProps = {
   flow: string;
   analysisMode: "light" | "deep";
@@ -356,7 +286,7 @@ export function ExistingOwnerFlowViews(props: ExistingOwnerFlowViewsProps) {
     <div style={PAGE_BG}>
       <div className="min-h-screen flex flex-col items-center justify-start pt-20 px-4">
         <div className="w-full max-w-3xl">
-          <TopBar onBack={() => setFlow("analysisModeSelect")} />
+          <TopBar onBack={() => setFlow("existingEntry")} />
           <div className="inline-flex items-center gap-2 px-3.5 py-2 rounded-full mb-6" style={{ background: "rgba(249,115,22,0.15)", border: "1px solid rgba(249,115,22,0.35)", fontSize: "0.8rem", fontWeight: 600, color: "#fb923c" }}>
             <Sparkles style={{ width: "14px", height: "14px" }} />
             기존 사장님 안내
@@ -369,19 +299,13 @@ export function ExistingOwnerFlowViews(props: ExistingOwnerFlowViewsProps) {
               이 분석은 AI를 활용한 결과문입니다.
               <br />
               실제 효과가 미비하거나 없을 수 있으니 주의하시길 바랍니다.
-              {analysisMode === "deep" && (
-                <>
-                  <br />
-                  집중분석은 가벼운 분석보다 분석 및 결과 생성에 시간이 더 소요될 수 있습니다.
-                </>
-              )}
             </p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <button onClick={() => setFlow("analysisModeSelect")} className="h-[54px] rounded-2xl transition-all active:scale-[0.99]" style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.75)", fontSize: "0.98rem", fontWeight: 700, border: "1px solid rgba(255,255,255,0.15)", cursor: "pointer" }}>
+            <button onClick={() => setFlow("existingEntry")} className="h-[54px] rounded-2xl transition-all active:scale-[0.99]" style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.75)", fontSize: "0.98rem", fontWeight: 700, border: "1px solid rgba(255,255,255,0.15)", cursor: "pointer" }}>
               돌아가기
             </button>
-            <button onClick={() => setFlow(analysisMode === "deep" ? "deepCategorySelect" : "exCategorySelect")} className="h-[54px] rounded-2xl transition-all active:scale-[0.99]" style={{ background: "linear-gradient(135deg,#10b981,#34d399)", color: "white", fontSize: "0.98rem", fontWeight: 700, border: "none", cursor: "pointer", boxShadow: "0 8px 28px rgba(16,185,129,0.4)" }}>
+            <button onClick={() => setFlow("exCategorySelect")} className="h-[54px] rounded-2xl transition-all active:scale-[0.99]" style={{ background: "linear-gradient(135deg,#10b981,#34d399)", color: "white", fontSize: "0.98rem", fontWeight: 700, border: "none", cursor: "pointer", boxShadow: "0 8px 28px rgba(16,185,129,0.4)" }}>
               확인하고 계속하기
             </button>
           </div>
@@ -390,150 +314,25 @@ export function ExistingOwnerFlowViews(props: ExistingOwnerFlowViewsProps) {
     </div>
   );
 
-  if (flow === "deepPosInput") return (
-    <div style={PAGE_BG}>
-      <div className="min-h-screen flex flex-col items-center justify-start pt-20 px-4">
-        <div className="w-full max-w-3xl">
-          <TopBar onBack={() => setFlow("deepCategorySelect")} />
-          <div className="inline-flex items-center gap-2 px-3.5 py-2 rounded-full mb-6" style={{ background: "rgba(16,185,129,0.15)", border: "1px solid rgba(16,185,129,0.35)", fontSize: "0.8rem", fontWeight: 600, color: "#34d399" }}>
-            <Sparkles style={{ width: "14px", height: "14px" }} />
-            집중분석 POS 데이터 입력
-          </div>
-          <h2 className="mb-3" style={{ fontSize: "clamp(1.6rem, 4vw, 2.2rem)", fontWeight: 800, letterSpacing: "-0.04em", lineHeight: 1.25 }}>POS 매출 데이터를 입력해주세요</h2>
-          <p className="mb-6" style={{ color: "rgba(255,255,255,0.45)", fontSize: "0.95rem" }}>수기 입력 또는 CSV 업로드 중 편한 방식을 선택할 수 있습니다.</p>
-          <div className="grid grid-cols-2 gap-3 mb-6">
-            <button onClick={() => setPosInputMode("manual")} className="h-[48px] rounded-xl flex items-center justify-center gap-2 transition-all" style={{ background: posInputMode === "manual" ? "rgba(16,185,129,0.18)" : "rgba(255,255,255,0.05)", border: posInputMode === "manual" ? "1px solid #10b981" : "1px solid rgba(255,255,255,0.1)", color: posInputMode === "manual" ? "#34d399" : "rgba(255,255,255,0.6)" }}>
-              <Keyboard style={{ width: "15px", height: "15px" }} /> 수기 입력
-            </button>
-            <button onClick={() => setPosInputMode("csv")} className="h-[48px] rounded-xl flex items-center justify-center gap-2 transition-all" style={{ background: posInputMode === "csv" ? "rgba(16,185,129,0.18)" : "rgba(255,255,255,0.05)", border: posInputMode === "csv" ? "1px solid #10b981" : "1px solid rgba(255,255,255,0.1)", color: posInputMode === "csv" ? "#34d399" : "rgba(255,255,255,0.6)" }}>
-              <FileUp style={{ width: "15px", height: "15px" }} /> CSV 업로드
-            </button>
-          </div>
-          {posInputMode === "csv" && (
-            <div className="rounded-2xl p-5 mb-5" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)" }}>
-              <p className="mb-3" style={{ fontSize: "0.83rem", color: "rgba(255,255,255,0.45)" }}>
-                <strong style={{ color: "#34d399" }}>POS·결제·매출 CSV</strong>면 형식 제한 없이 업로드할 수
-                있습니다. (토스·배민·카드사·POS 등) AI가 컬럼을 읽어 요약·분석에 사용합니다.
-              </p>
-              <button
-                type="button"
-                onClick={onDownloadPosCsvTemplate}
-                className="mb-3 w-full h-[42px] rounded-xl transition-all"
-                style={{
-                  background: "rgba(255,255,255,0.06)",
-                  border: "1px solid rgba(255,255,255,0.12)",
-                  color: "rgba(255,255,255,0.65)",
-                  fontSize: "0.82rem",
-                  fontWeight: 600,
-                  cursor: "pointer",
-                }}
-              >
-                (선택) 수기입력용 지표 샘플 CSV
-              </button>
-              <input
-                type="file"
-                accept=".csv,text/csv"
-                onChange={(e) => {
-                  const file = e.currentTarget.files?.[0];
-                  if (file) handlePosCsvUpload(file);
-                }}
-                style={{ width: "100%", color: "rgba(255,255,255,0.7)" }}
-              />
-              {csvError && <p className="mt-3" style={{ color: "#fda4af", fontSize: "0.82rem" }}>{csvError}</p>}
-              {posCsvReady && !csvError && posCsvUpload && (
-                <p className="mt-3" style={{ color: "#34d399", fontSize: "0.82rem" }}>
-                  「{posCsvUpload.fileName}」 {posCsvUpload.rowCount.toLocaleString()}
-                  행 · 컬럼 {posCsvUpload.columns.length}개 인식됨. 다음으로 진행하세요.
-                </p>
-              )}
-            </div>
-          )}
-          {posCsvReady && posCsvUpload && posInputMode === "manual" && (
-            <div
-              className="rounded-2xl p-4 mb-4"
-              style={{
-                background: "rgba(16,185,129,0.08)",
-                border: "1px solid rgba(16,185,129,0.28)",
-              }}
-            >
-              <p style={{ fontSize: "0.88rem", color: "#6ee7b7", lineHeight: 1.6 }}>
-                「{posCsvUpload.fileName}」 CSV가 업로드되어 있습니다. 수기 입력 없이 아래
-                「POS 데이터 저장 후 다음」으로 진행하면 CSV 기반으로 추가 질문과 솔루션이
-                생성됩니다.
-              </p>
-            </div>
-          )}
-          {posInputMode === "manual" && !(posCsvReady && posCsvUpload) && (
-            <div className="space-y-4 mb-4">
-              {selectedDeepCategories.map((category) => {
-                const categoryFields = DEEP_CATEGORY_DATA_FIELDS[category] ?? [];
-                if (categoryFields.length === 0) return null;
-                return (
-                  <div key={category} className="rounded-2xl p-5" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)" }}>
-                    <h3 style={{ fontSize: "1rem", fontWeight: 800, color: "#34d399", marginBottom: "12px" }}>{category} 데이터</h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {categoryFields.map((field) => (
-                        <div key={field.key}>
-                          <label style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.45)", display: "block", marginBottom: "6px" }}>{field.label}</label>
-                          <input
-                            value={posMetrics[field.key]}
-                            onChange={(e) => {
-                              setPosMetrics((prev) => ({ ...prev, [field.key]: e.target.value }));
-                              setPosInputError("");
-                            }}
-                            className="w-full h-[46px] rounded-xl px-3"
-                            style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", color: "white" }}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-          {posInputError && <p className="mb-4" style={{ color: "#fda4af", fontSize: "0.84rem" }}>{posInputError}</p>}
-          <button
-            onClick={onDeepPosContinue}
-            className="w-full h-[56px] rounded-2xl transition-all active:scale-[0.99]"
-            style={{ background: "linear-gradient(135deg,#10b981,#34d399)", color: "white", fontSize: "1.02rem", fontWeight: 700, border: "none", cursor: "pointer", boxShadow: "0 8px 28px rgba(16,185,129,0.4)" }}
-          >
-            POS 데이터 저장 후 다음
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-
-  if (flow === "exCategorySelect" || flow === "deepCategorySelect") {
-    const isDeep = flow === "deepCategorySelect";
-    const selected = isDeep ? selectedDeepCategories : selectedExistingCategories;
-    const setSelected = isDeep ? setSelectedDeepCategories : setSelectedExistingCategories;
+  if (flow === "exCategorySelect") {
+    const selected = selectedExistingCategories;
+    const setSelected = setSelectedExistingCategories;
     return (
       <div style={PAGE_BG}>
-        <style>{`
-          .existing-category-scroll {
-            scrollbar-width: thin;
-            scrollbar-color: rgba(16,185,129,0.75) rgba(255,255,255,0.08);
-          }
-          .existing-category-scroll::-webkit-scrollbar { width: 10px; height: 10px; }
-          .existing-category-scroll::-webkit-scrollbar-track { background: rgba(255,255,255,0.08); border-radius: 999px; }
-          .existing-category-scroll::-webkit-scrollbar-thumb { background: linear-gradient(180deg, rgba(16,185,129,0.95), rgba(52,211,153,0.85)); border-radius: 999px; border: 2px solid rgba(20,23,32,0.95); }
-        `}</style>
         <div className="min-h-screen flex flex-col items-center justify-start pt-20 px-4">
-          <div className="w-full max-w-3xl">
-            <TopBar onBack={() => setFlow(isDeep ? "existingNotice" : "typeSelect")} />
+          <div className="w-full max-w-4xl">
+            <TopBar onBack={() => setFlow("existingNotice")} />
             <div className="inline-flex items-center gap-2 px-3.5 py-2 rounded-full mb-6" style={{ background: "rgba(16,185,129,0.15)", border: "1px solid rgba(16,185,129,0.35)", fontSize: "0.8rem", fontWeight: 600, color: "#34d399" }}>
               <Sparkles style={{ width: "14px", height: "14px" }} />
-              {isDeep ? "집중분석 카테고리 선택" : "기존 사장님 맞춤 카테고리 선택"}
+              가벼운 분석 · 카테고리 선택
             </div>
             <h2 className="mb-3" style={{ fontSize: "clamp(1.6rem, 4vw, 2.2rem)", fontWeight: 800, letterSpacing: "-0.04em", lineHeight: 1.25 }}>
-              {isDeep ? "어떤 항목을 깊이 분석할까요?" : "어떤 항목을 집중 분석할까요?"}
+              어떤 항목을 분석할까요?
             </h2>
             <p className="mb-8" style={{ color: "rgba(255,255,255,0.45)", fontSize: "0.95rem" }}>
-              {isDeep ? "선택한 카테고리에 대해 더 세부적인 질문과 실행 KPI를 제공합니다." : "복수 선택 가능하며, 선택한 카테고리의 질문과 솔루션만 결과에 반영됩니다."}
+              복수 선택 가능하며, 선택한 카테고리의 질문과 솔루션만 결과에 반영됩니다.
             </p>
-            <div className="existing-category-scroll flex gap-3 mb-2 overflow-x-auto pb-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-8">
               {EXISTING_CATEGORY_OPTIONS.map((item) => {
                 const isSelected = selected.includes(item.label);
                 const visual = EXISTING_CATEGORY_VISUALS[item.label];
@@ -542,8 +341,8 @@ export function ExistingOwnerFlowViews(props: ExistingOwnerFlowViewsProps) {
                   <button
                     key={item.label}
                     onClick={() => setSelected((prev) => (prev.includes(item.label) ? prev.filter((v) => v !== item.label) : [...prev, item.label]))}
-                    className="text-left rounded-2xl p-5 transition-all active:scale-[0.98] shrink-0"
-                    style={{ width: "205px", minHeight: "240px", background: isSelected ? "rgba(16,185,129,0.12)" : "rgba(255,255,255,0.04)", border: isSelected ? "1.5px solid #10b981" : "1px solid rgba(255,255,255,0.1)" }}
+                    className="text-left rounded-2xl p-5 transition-all active:scale-[0.98] h-full"
+                    style={{ minHeight: "200px", background: isSelected ? "rgba(16,185,129,0.12)" : "rgba(255,255,255,0.04)", border: isSelected ? "1.5px solid #10b981" : "1px solid rgba(255,255,255,0.1)" }}
                   >
                     <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-4" style={{ background: visual?.tint ?? "rgba(16,185,129,0.2)" }}>
                       <Icon style={{ width: "20px", height: "20px", color: isSelected ? "#34d399" : "rgba(255,255,255,0.8)" }} />
@@ -557,18 +356,11 @@ export function ExistingOwnerFlowViews(props: ExistingOwnerFlowViewsProps) {
                 );
               })}
             </div>
-            <p className="mb-8" style={{ color: "rgba(255,255,255,0.3)", fontSize: "0.78rem" }}>좌우로 스크롤하여 모든 카테고리를 확인할 수 있습니다.</p>
             <button
               onClick={() => {
                 setAnswers((prev) => ({ ...prev, selectedCategories: selected }));
-                if (isDeep) {
-                  setPosInputError("");
-                  setCsvError("");
-                  setFlow("deepPosInput");
-                } else {
-                  setExistingQuestionIndex(0);
-                  setFlow("existingQuestions");
-                }
+                setExistingQuestionIndex(0);
+                setFlow("existingQuestions");
               }}
               disabled={selected.length === 0}
               className="w-full h-[56px] rounded-2xl transition-all active:scale-[0.99]"
@@ -582,7 +374,7 @@ export function ExistingOwnerFlowViews(props: ExistingOwnerFlowViewsProps) {
                 boxShadow: selected.length ? "0 8px 28px rgba(16,185,129,0.4)" : "none",
               }}
             >
-              {isDeep ? "선택한 카테고리 데이터 입력하기" : "선택한 카테고리로 질문 시작하기"}
+              선택한 카테고리로 질문 시작하기
             </button>
           </div>
         </div>
@@ -590,16 +382,15 @@ export function ExistingOwnerFlowViews(props: ExistingOwnerFlowViewsProps) {
     );
   }
 
-  if (flow === "existingQuestions" || flow === "deepQuestions") {
-    const isDeep = flow === "deepQuestions";
-    const total = isDeep ? deepQuestionFlow.length : existingQuestionFlow.length;
-    const index = isDeep ? deepQuestionIndex : existingQuestionIndex;
-    const current = isDeep ? deepQuestionFlow[deepQuestionIndex] : existingQuestionFlow[existingQuestionIndex];
+  if (flow === "existingQuestions") {
+    const total = existingQuestionFlow.length;
+    const index = existingQuestionIndex;
+    const current = existingQuestionFlow[existingQuestionIndex];
     const isFirst = index === 0;
     const isLast = index === total - 1;
     if (!current) {
       if (onQuestionsComplete) {
-        onQuestionsComplete(isDeep ? "deep" : "light");
+        onQuestionsComplete("light");
       } else {
         setFlow("loading");
       }
@@ -607,23 +398,21 @@ export function ExistingOwnerFlowViews(props: ExistingOwnerFlowViewsProps) {
     }
     const goBack = () => {
       if (isFirst) {
-        setFlow(isDeep ? "deepPosInput" : "exCategorySelect");
+        setFlow("exCategorySelect");
         return;
       }
-      if (isDeep) setDeepQuestionIndex((prev) => Math.max(0, prev - 1));
-      else setExistingQuestionIndex((prev) => Math.max(0, prev - 1));
+      setExistingQuestionIndex((prev) => Math.max(0, prev - 1));
     };
     const goNext = () => {
       if (isLast) {
         if (onQuestionsComplete) {
-          onQuestionsComplete(isDeep ? "deep" : "light");
+          onQuestionsComplete("light");
           return;
         }
         setFlow("loading");
         return;
       }
-      if (isDeep) setDeepQuestionIndex((prev) => Math.min(total - 1, prev + 1));
-      else setExistingQuestionIndex((prev) => Math.min(total - 1, prev + 1));
+      setExistingQuestionIndex((prev) => Math.min(total - 1, prev + 1));
     };
     if (current.type === "address") {
       const isValid = !!addrQ2ex.sido;

@@ -124,7 +124,9 @@ public class AnalysisService {
                     jsonToStore,
                     new TypeReference<LinkedHashMap<String, Object>>() {}
             );
-            body.put("historyId", historyId);
+            if (historyId != null) {
+                body.put("historyId", historyId);
+            }
             return objectMapper.writeValueAsString(body);
         } catch (Exception e) {
             System.out.println("⚠️ historyId 병합 실패: " + e.getMessage());

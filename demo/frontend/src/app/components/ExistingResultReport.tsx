@@ -1091,7 +1091,7 @@ function getCategoryInsight(
         "광고는 전환 시간대 집중 집행",
       ],
       ctaLabel: "마케팅 도구 보러가기",
-      ctaPath: "/tools",
+      ctaPath: "/owner?tab=tools",
     };
   }
 
@@ -1112,7 +1112,7 @@ function getCategoryInsight(
         "단골 고객군(연령/방문목적) 기준으로 안내 문구를 분리하면 반응률이 높아집니다.",
       ],
       ctaLabel: "커뮤니티 사례 보기",
-      ctaPath: "/community",
+      ctaPath: "/owner?tab=community",
     };
   }
 
@@ -1126,7 +1126,7 @@ function getCategoryInsight(
         "긍정 리뷰 무응답으로 신뢰 기회 손실",
       ],
       ctaLabel: "응대 가이드 확인",
-      ctaPath: "/community",
+      ctaPath: "/owner?tab=community",
     };
   }
 
@@ -1139,7 +1139,7 @@ function getCategoryInsight(
         (item) => `${item.name} · ${item.price} (${item.trend})`,
       ),
       ctaLabel: "시세 사이트 바로가기",
-      ctaPath: "/market-price",
+      ctaPath: "/owner?tab=market-price",
     };
   }
 
@@ -1152,7 +1152,7 @@ function getCategoryInsight(
       "주간 운영 회고(30분) 정례화",
     ],
     ctaLabel: "지원사업 보러가기",
-    ctaPath: "/support",
+    ctaPath: "/owner?tab=support",
   };
 }
 
@@ -2013,7 +2013,7 @@ export function ExistingResultReport({
           (item) => `${item.name} · ${item.price} (${item.trend})`,
         ),
         ctaLabel: "시세 사이트 바로가기",
-        ctaPath: "/market-price",
+        ctaPath: "/owner?tab=market-price",
       };
     }
     return getCategoryInsight(label, answers, bizType);

@@ -128,9 +128,11 @@ public class NewStartupAnalysisService {
             response.put("apiContext", apiContext);
             response.put("answers", answers);
 
-            if (!report.isBlank()) {
+            if (!report.isBlank() && userId != null) {
                 Long historyId = historySaver.saveNewStartupReport(answers, report, userId);
-                response.put("historyId", historyId);
+                if (historyId != null) {
+                    response.put("historyId", historyId);
+                }
             }
 
             return response;

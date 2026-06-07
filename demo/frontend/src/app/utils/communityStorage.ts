@@ -1,4 +1,4 @@
-import { CommunityPost, MOCK_POSTS, findPostById } from "./communityData";
+import { CommunityPost, findPostById } from "./communityData";
 import { getStoredUser } from "./auth";
 
 export type UserCommunityPost = CommunityPost & {
@@ -94,11 +94,7 @@ export function addUserPost(
   userKey?: string | null,
 ): UserCommunityPost {
   const data = loadRaw(userKey);
-  const nextId = Math.max(
-    1000,
-    ...MOCK_POSTS.map((p) => p.id),
-    ...data.posts.map((p) => p.id),
-  ) + 1;
+  const nextId = Math.max(1000, ...data.posts.map((p) => p.id), 0) + 1;
   const post: UserCommunityPost = {
     id: nextId,
     category: input.category,
@@ -152,5 +148,5 @@ export function getCommentsForPost(postId: number, userKey?: string | null): Com
 
 export function getAllPostsForBoard(userKey?: string | null): CommunityPost[] {
   const { posts } = loadRaw(userKey);
-  return [...posts, ...MOCK_POSTS];
+  return [...posts];
 }

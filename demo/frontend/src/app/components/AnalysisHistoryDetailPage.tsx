@@ -59,10 +59,7 @@ export function AnalysisHistoryDetailPage() {
     );
   }
 
-  const isExisting =
-    detail.userType?.toUpperCase() === "EXISTING" ||
-    detail.result?.type === "result" ||
-    Boolean(detail.result?.existingSolution);
+  const isExisting = detail.userType?.toUpperCase() === "EXISTING";
 
   const selectedCategories = Array.isArray(detail.selectedCategories)
     ? detail.selectedCategories

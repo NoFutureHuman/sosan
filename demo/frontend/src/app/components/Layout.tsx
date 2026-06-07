@@ -24,13 +24,29 @@ import { AuthNavButton } from "./AuthNavButton";
 import { useAuthStatus } from "../hooks/useAuthStatus";
 
 const navItems = [
-  { path: "/home", label: "홈", icon: Home },
-  { path: "/support", label: "지원사업", icon: FileText },
-  { path: "/community", label: "커뮤니티", icon: Users },
-  { path: "/tools", label: "서비스", icon: Wrench },
-  { path: "/market-price", label: "시세", icon: TrendingUp },
-  { path: "/trade", label: "광장", icon: ShoppingCart },
+  { path: "/home", label: "홈", icon: Home, tab: null as string | null },
+  { path: "/owner", label: "커뮤니티", icon: Users, tab: "community" },
+  { path: "/owner", label: "지원사업", icon: FileText, tab: "support" },
+  { path: "/owner", label: "시세", icon: TrendingUp, tab: "market-price" },
+  { path: "/owner", label: "서비스", icon: Wrench, tab: "tools" },
+  { path: "/trade", label: "광장", icon: ShoppingCart, tab: null },
 ];
+
+function navItemTo(item: (typeof navItems)[number]) {
+  return item.tab ? { pathname: item.path, search: `?tab=${item.tab}` } : item.path;
+}
+
+function isNavItemActive(
+  item: (typeof navItems)[number],
+  pathname: string,
+  search: string,
+) {
+  if (item.tab) {
+    return pathname === "/owner" && new URLSearchParams(search).get("tab") === item.tab;
+  }
+  if (item.path === "/home") return pathname === "/home";
+  return pathname === item.path || pathname.startsWith(item.path + "/");
+}
 
 export function Layout() {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -86,14 +102,11 @@ export function Layout() {
             {/* Desktop Nav */}
             <nav className="hidden lg:flex items-center">
               {navItems.map((item) => {
-                const isActive =
-                  item.path === "/home"
-                    ? location.pathname === "/home"
-                    : location.pathname === item.path || location.pathname.startsWith(item.path + "/");
+                const isActive = isNavItemActive(item, location.pathname, location.search);
                 return (
                   <Link
-                    key={item.path}
-                    to={item.path}
+                    key={`${item.path}-${item.label}`}
+                    to={navItemTo(item)}
                     className={`relative flex items-center gap-1.5 px-3.5 py-2 rounded-lg transition-all duration-200 mx-0.5 ${
                       isActive
                         ? "text-primary bg-primary/10"
@@ -154,14 +167,11 @@ export function Layout() {
           <div className="lg:hidden border-t border-white/5 animate-in slide-in-from-top-2 duration-200" style={{ backgroundColor: '#141720' }}>
             <nav className="flex flex-col p-3 gap-0.5">
               {navItems.map((item) => {
-                const isActive =
-                  item.path === "/home"
-                    ? location.pathname === "/home"
-                    : location.pathname === item.path || location.pathname.startsWith(item.path + "/");
+                const isActive = isNavItemActive(item, location.pathname, location.search);
                 return (
                   <Link
-                    key={item.path}
-                    to={item.path}
+                    key={`${item.path}-${item.label}`}
+                    to={navItemTo(item)}
                     onClick={() => setMobileOpen(false)}
                     className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${
                       isActive
@@ -234,8 +244,8 @@ export function Layout() {
               <h4 className="text-white mb-4" style={{ fontSize: '0.85rem', fontWeight: 600 }}>서비스</h4>
               <ul className="space-y-2.5">
                 {[
-                  { label: "정부 지원사업", path: "/support" },
-                  { label: "사장님 커뮤니티", path: "/community" },
+                  { label: "정부 지원사업", path: "/owner?tab=support" },
+                  { label: "사장님 커뮤니티", path: "/owner?tab=community" },
                 ].map((item) => (
                   <li key={item.label}>
                     <Link to={item.path} className="text-gray-400 hover:text-white transition-colors" style={{ fontSize: '0.84rem' }}>{item.label}</Link>
@@ -247,10 +257,10 @@ export function Layout() {
               <h4 className="text-white mb-4" style={{ fontSize: '0.85rem', fontWeight: 600 }}>도구</h4>
               <ul className="space-y-2.5">
                 {[
-                  { label: "재고 관리", path: "/tools" },
-                  { label: "매출/지출 장부", path: "/tools" },
-                  { label: "직원 근무관리", path: "/tools" },
-                  { label: "마진 계산기", path: "/tools" },
+                  { label: "재고 관리", path: "/owner?tab=tools" },
+                  { label: "매출/지출 장부", path: "/owner?tab=tools" },
+                  { label: "직원 근무관리", path: "/owner?tab=tools" },
+                  { label: "마진 계산기", path: "/owner?tab=tools" },
                   { label: "중고 거래소", path: "/market" },
                 ].map((item) => (
                   <li key={item.label}>

@@ -72,11 +72,11 @@ const stats = [
 ];
 
 const quickLinks = [
-  { icon: FileText, label: "맞춤 지원사업", desc: "나에게 딱 맞는 보조금 찾기", path: "/support", color: "#10b981" },
+  { icon: FileText, label: "맞춤 지원사업", desc: "나에게 딱 맞는 보조금 찾기", path: "/owner?tab=support", color: "#10b981" },
   { icon: Store, label: "상권 분석", desc: "지역별 유동인구 분석", path: "/ai-analysis", color: "#34d399" },
-  { icon: Wrench, label: "디지털 장부", desc: "매출·매입 자동 관리", path: "/tools", color: "#10b981" },
-  { icon: TrendingUp, label: "식자재 시세", desc: "실시간 전국 도매시장 시세", path: "/market-price", color: "#14b8a6" },
-  { icon: MessageCircle, label: "사장님 커뮤니티", desc: "업종별 사장님 고민 해결", path: "/community", color: "#3b82f6" },
+  { icon: Wrench, label: "디지털 장부", desc: "매출·매입 자동 관리", path: "/owner?tab=tools", color: "#10b981" },
+  { icon: TrendingUp, label: "식자재 시세", desc: "실시간 전국 도매시장 시세", path: "/owner?tab=market-price", color: "#14b8a6" },
+  { icon: MessageCircle, label: "사장님 커뮤니티", desc: "업종별 사장님 고민 해결", path: "/owner?tab=community", color: "#3b82f6" },
 ];
 
 export function HomePage() {
@@ -212,7 +212,7 @@ export function HomePage() {
               </h3>
               <p className="text-sm text-gray-500 font-medium">전국 도매시장 데이터를 기반으로 실시간 가격 변동을 제공합니다.</p>
             </div>
-            <Link to="/market-price" className="flex items-center gap-2 text-sm font-bold text-gray-400 hover:text-emerald-400 transition-colors">
+            <Link to="/owner?tab=market-price" className="flex items-center gap-2 text-sm font-bold text-gray-400 hover:text-emerald-400 transition-colors">
               전체 시세 보기 <ChevronRight className="w-4 h-4" />
             </Link>
           </div>

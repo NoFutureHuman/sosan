@@ -62,7 +62,7 @@ tasks.named('test') {
     useJUnitPlatform()
 }
 
-// MySQL 연결 실패 시: .\gradlew.bat bootRun -Pdev
+// MySQL 연결 실패 시: .\gradlew.bat bootRun -Pdev (파일 H2, 재시작 후에도 데이터 유지)
 // 설정 파일: sosan-main/src/main/resources/application.properties
 tasks.named('bootRun') {
     if (project.hasProperty('dev')) {

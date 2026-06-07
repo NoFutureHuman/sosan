@@ -15,7 +15,7 @@ const businessTypes = [
   { value: "other",         label: "기타" },
 ];
 
-const STEPS = ["가입 방법", "정보 입력", "완료"] as const;
+const STEPS = ["이메일 입력", "정보 입력", "완료"] as const;
 type Step = "social" | "form" | "done";
 
 export function RegisterPage() {
@@ -104,7 +104,7 @@ export function RegisterPage() {
           ))}
         </div>
 
-        {/* ══ STEP 1: 소셜 / 이메일 선택 ══ */}
+        {/* ══ STEP 1: 이메일 입력 ══ */}
         {step === "social" && (
           <div>
             <h1 className="text-white mb-1.5" style={{ fontSize: "2rem", fontWeight: 800, letterSpacing: "-0.04em" }}>
@@ -113,49 +113,6 @@ export function RegisterPage() {
             <p className="mb-8" style={{ fontSize: "0.9rem", color: "rgba(255,255,255,0.42)" }}>
               이메일 하나로 모든 서비스를 즉시 이용할 수 있어요.
             </p>
-
-            {/* 소셜 가입 */}
-            <div className="grid grid-cols-2 gap-3 mb-6">
-              {[
-                {
-                  name: "카카오",
-                  bg: "#FEE500", color: "#000",
-                  icon: (
-                    <svg viewBox="0 0 24 24" width="18" height="18" fill="#000">
-                      <path d="M12 3C6.477 3 2 6.477 2 10.8c0 2.737 1.65 5.147 4.138 6.612l-1.053 3.92a.3.3 0 00.46.328L9.9 19.25A11.518 11.518 0 0012 19.6c5.523 0 10-3.477 10-7.8S17.523 3 12 3z" />
-                    </svg>
-                  ),
-                },
-                {
-                  name: "네이버",
-                  bg: "#03C75A", color: "#fff",
-                  icon: (
-                    <svg viewBox="0 0 24 24" width="18" height="18" fill="#fff">
-                      <path d="M16.273 12.845L7.376 3H3v18h7.727V11.155L19.624 21H24V3h-7.727z" />
-                    </svg>
-                  ),
-                },
-              ].map((s) => (
-                <button
-                  key={s.name}
-                  type="button"
-                  onClick={() => setStep("form")}
-                  className="flex items-center justify-center gap-2 h-[50px] rounded-xl transition-all active:scale-[0.98]"
-                  style={{ background: s.bg, color: s.color, fontSize: "0.88rem", fontWeight: 700, border: "none", cursor: "pointer" }}
-                  onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.9")}
-                  onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
-                >
-                  {s.icon}{s.name}로 가입
-                </button>
-              ))}
-            </div>
-
-            {/* 구분선 */}
-            <div className="flex items-center gap-4 mb-6">
-              <div className="flex-1 h-px" style={{ background: "rgba(255,255,255,0.08)" }} />
-              <span style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.25)" }}>또는 이메일로 가입</span>
-              <div className="flex-1 h-px" style={{ background: "rgba(255,255,255,0.08)" }} />
-            </div>
 
             {/* 이메일 입력 */}
             <form onSubmit={(e) => { e.preventDefault(); if (email.trim()) setStep("form"); }} className="space-y-3">
@@ -222,9 +179,6 @@ export function RegisterPage() {
             </h1>
             {email && (
               <p className="mb-7" style={{ fontSize: "0.84rem", color: "rgba(255,255,255,0.35)" }}>{email}</p>
-            )}
-            {!email && (
-              <p className="mb-7" style={{ fontSize: "0.84rem", color: "rgba(255,255,255,0.35)" }}>소셜 계정으로 가입</p>
             )}
 
             {error && (

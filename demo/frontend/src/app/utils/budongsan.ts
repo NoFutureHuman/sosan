@@ -514,12 +514,34 @@ function getBizKeyword(bizType: string): string {
 }
 
 export async function fetchBizinfoSupport(
-  _bizType = "",
+  bizType = "",
 ): Promise<BizinfoContext | null> {
-  // bizinfo.go.kr는 포털에서 별도 키 신청 필요
-  // smes.go.kr는 서버 IP 차단으로 브라우저 직접 호출 불가
-  // 키 확보 후 아래 주석 해제하여 사용
-  return null;
+  try {
+    const keyword = getBizKeyword(bizType);
+    const res = await fetch(
+      `/api/support/programs?bizType=${encodeURIComponent(bizType)}`,
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (!Array.isArray(data.programs) || data.programs.length === 0) return null;
+
+    const rawItems = data.programs.map((p: Record<string, string>) => ({
+      pblancId: p.id ?? "",
+      pblancNm: p.title ?? "",
+      excInsttNm: p.org ?? "",
+      jrsdInsttNm: p.org ?? "",
+      reqstBeginEndDe: p.period ?? p.deadline ?? "",
+      rcptEndDe: p.deadline ?? "",
+      detailUrl: p.url ?? "",
+      sprtScl: p.amount ?? "",
+      sprtTrgtNm: p.target ?? "",
+      bsnsSopcBizAreaNm: p.category ?? "",
+    }));
+
+    return parseBizinfoItems(rawItems, keyword, data.total ?? rawItems.length);
+  } catch {
+    return null;
+  }
 }
 
 function parseBizinfoItems(rawItems: any[], keyword: string, totalCount: number): BizinfoContext {
@@ -548,7 +570,7 @@ function parseBizinfoItems(rawItems: any[], keyword: string, totalCount: number)
       ? `${r.rcptBgnDe ?? ""} ~ ${r.rcptEndDe ?? ""}`
       : "";
     const link = r.detailUrl ?? r.url
-      ?? `https://www.smes.go.kr/fnct/pblancInfo/selectPblancInfo?pblancId=${id}`;
+      ?? `https://www.bizinfo.go.kr/sii/siia/selectSIIA200Detail.do?pblancId=${id}`;
 
     return {
       pblancId:    id,
@@ -576,11 +598,39 @@ export interface KamisMarketData {
   source?: string;
 }
 
-/** KAMIS 시세 — 백엔드 `/api/external/kamis` 미구현 시 null */
+/** KAMIS 시세 — 백엔드 `/api/market/ingredients` 프록시 */
 export async function fetchKamisMarketPrices(
   _bizType = "",
 ): Promise<KamisMarketData | null> {
-  return null;
+  try {
+    const res = await fetch("/api/market/ingredients");
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (!Array.isArray(data.items) || data.items.length === 0) return null;
+
+    return {
+      items: data.items.slice(0, 12).map((item: Record<string, unknown>) => {
+        const price = Number(item.price ?? 0);
+        const unit = String(item.unit ?? "");
+        const changePercent = Number(item.changePercent ?? 0);
+        const direction = String(item.direction ?? "stable");
+        const trendText =
+          direction === "up"
+            ? `+${changePercent}%`
+            : direction === "down"
+              ? `${changePercent}%`
+              : "보합";
+        return {
+          name: String(item.name ?? ""),
+          priceText: `${price.toLocaleString("ko-KR")}원${unit ? `/${unit}` : ""}`,
+          trendText,
+        };
+      }),
+      source: String(data.source ?? "KAMIS"),
+    };
+  } catch {
+    return null;
+  }
 }
 
 export function kamisItemsToReportBullets(

@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router";
-import { ArrowRight, Store, BarChart2, TrendingUp, Star } from "lucide-react";
+import { ArrowRight, Store, BarChart2, TrendingUp } from "lucide-react";
 import { AuthNavButtonLanding } from "./AuthNavButton";
 import { useAuthStatus } from "../hooks/useAuthStatus";
 
@@ -86,21 +86,6 @@ export function LandingPage() {
         className="relative flex flex-col items-center text-center px-6 pt-16 pb-20"
         style={{ zIndex: 1 }}
       >
-        {/* 뱃지 */}
-        <div
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-full mb-8"
-          style={{
-            background: "rgba(16,185,129,0.12)",
-            border: "1px solid rgba(16,185,129,0.35)",
-            fontSize: "0.8rem",
-            fontWeight: 600,
-            color: "#34d399",
-          }}
-        >
-          <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: "#10b981", display: "inline-block" }} />
-          정식 출시 기념 1개월 무료 체험
-        </div>
-
         {/* 타이틀 */}
         <h1
           style={{
@@ -111,9 +96,7 @@ export function LandingPage() {
             marginBottom: "24px",
           }}
         >
-          소상공인을 위한
-          <br />
-          <span style={{ color: "#10b981" }}>AI 사업 파트너</span>
+          <span style={{ color: "#10b981" }}>NOVA</span>
         </h1>
 
         {/* 서브텍스트 */}
@@ -151,20 +134,6 @@ export function LandingPage() {
         >
           지금 무료로 시작하기 <ArrowRight size={20} />
         </button>
-
-        {/* 신뢰 지표 */}
-        <div
-          className="flex items-center gap-5 mt-10 flex-wrap justify-center"
-          style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.28)" }}
-        >
-          <span className="flex items-center gap-1.5">
-            <Star size={12} style={{ color: "#fbbf24" }} /> 4.9점 평균 만족도
-          </span>
-          <span style={{ color: "rgba(255,255,255,0.1)" }}>|</span>
-          <span>3,200+ 사장님 이용 중</span>
-          <span style={{ color: "rgba(255,255,255,0.1)" }}>|</span>
-          <span>신용카드 없이 무료 시작</span>
-        </div>
       </section>
 
       {/* 피처 카드 3개 */}

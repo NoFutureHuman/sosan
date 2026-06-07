@@ -71,9 +71,9 @@ function ReportFooter() {
         리포트를 바탕으로 소상광장 서비스를 활용해 보세요
       </p>
       {[
-        { label: "정부 지원사업 보기", path: "/support", color: "#10b981" },
-        { label: "사장님 커뮤니티", path: "/community", color: "#34d399" },
-        { label: "식자재 시세 확인", path: "/market-price", color: "#6ee7b7" },
+        { label: "정부 지원사업 보기", path: "/owner?tab=support", color: "#10b981" },
+        { label: "사장님 커뮤니티", path: "/owner?tab=community", color: "#34d399" },
+        { label: "식자재 시세 확인", path: "/owner?tab=market-price", color: "#6ee7b7" },
       ].map((item) => (
         <Link
           key={item.path} to={item.path}

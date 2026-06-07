@@ -22,6 +22,11 @@ export default defineConfig({
 
   server: {
     proxy: {
+      // Spring 백엔드 (로그인·회원가입·AI 분석)
+      '/api': {
+        target: 'http://localhost:8081',
+        changeOrigin: true,
+      },
       // R-ONE API: CORS 우회 프록시
       '/proxy/r-one': {
         target: 'https://www.reb.or.kr',

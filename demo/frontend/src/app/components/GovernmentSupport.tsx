@@ -1,7 +1,6 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Search,
-  Filter,
   Clock,
   Building2,
   ChevronDown,
@@ -9,75 +8,106 @@ import {
   Bell,
   Bookmark,
   BookmarkCheck,
-  Tag,
-  TrendingUp,
   AlertCircle,
+  Loader2,
 } from "lucide-react";
 import { Button } from "./ui/button";
-import { Card, CardContent } from "./ui/card";
-import { Badge } from "./ui/badge";
 import { Input } from "./ui/input";
 
 const categories = ["전체", "자금 지원", "교육/컨설팅", "디지털 전환", "임차료", "마케팅", "수출"];
 const regions = ["전국", "서울", "경기", "부산", "대구", "인천", "광주", "대전", "울산", "세종", "강원", "충북", "충남", "전북", "전남", "경북", "경남", "제주"];
 
-const supportData = [
-  {
-    id: 1, title: "2026년 소상공인 디지털 전환 지원사업", org: "중소벤처기업부", category: "디지털 전환", region: "전국",
-    amount: "최대 500만원", deadline: "2026.03.31", status: "접수중",
-    desc: "소상공인의 온라인 판로 개척 및 디지털 역량 강화를 위한 맞춤형 지원 사업입니다.",
-    tags: ["디지털전환", "온라인판매"],
-  },
-  {
-    id: 2, title: "서울시 소상공인 임차료 보조금", org: "서울특별시", category: "임차료", region: "서울",
-    amount: "월 최대 30만원 (6개월)", deadline: "2026.04.15", status: "접수중",
-    desc: "서울 소재 소상공인 임차료 부담 경감을 위한 보조금 지원 프로그램",
-    tags: ["임차료", "서울시"],
-  },
-  {
-    id: 3, title: "경기도 소상공인 경영안정 자금", org: "경기도", category: "자금 지원", region: "경기",
-    amount: "최대 3,000만원 (저금리 대출)", deadline: "2026.03.20", status: "접수중",
-    desc: "경기도 내 소상공인의 경영 안정을 위한 저금리 대출 프로그램",
-    tags: ["대출", "경기도"],
-  },
-  {
-    id: 4, title: "부산시 전통시장 현대화 사업", org: "부산광역시", category: "마케팅", region: "부산",
-    amount: "점포당 최대 200만원", deadline: "2026.05.01", status: "접수예정",
-    desc: "전통시장 내 소상공인 점포 시설 현대화 및 마케팅 지원",
-    tags: ["전통시장", "현대화"],
-  },
-  {
-    id: 5, title: "소상공인 스마트상점 기술보급", org: "소상공인시장진흥공단", category: "디지털 전환", region: "전국",
-    amount: "최대 700만원", deadline: "2026.04.30", status: "접수중",
-    desc: "스마트 결제, 키오스크, 재고관리 시스템 등 기술 도입 비용 지원",
-    tags: ["스마트상점", "키오스크"],
-  },
-  {
-    id: 6, title: "소상공인 무료 세무/법률 컨설팅", org: "중소벤처기업부", category: "교육/컨설팅", region: "전국",
-    amount: "무료", deadline: "상시 접수", status: "상시",
-    desc: "세무, 법률, 노무 등 소상공인 경영 관련 전문가 무료 상담 서비스",
-    tags: ["컨설팅", "세무"],
-  },
-  {
-    id: 7, title: "인천시 소상공인 수출 지원사업", org: "인천광역시", category: "수출", region: "인천",
-    amount: "최대 1,000만원", deadline: "2026.06.30", status: "접수중",
-    desc: "해외 온라인 플랫폼 입점 및 수출 역량 강화 지원",
-    tags: ["수출", "해외판매"],
-  },
-  {
-    id: 8, title: "소상공인 역량강화 아카데미", org: "소상공인시장진흥공단", category: "교육/컨설팅", region: "전국",
-    amount: "무료 (교육비 전액 지원)", deadline: "2026.05.15", status: "접수예정",
-    desc: "SNS 마케팅, 경영전략, 재무관리 등 온·오프라인 교육 과정 제공",
-    tags: ["교육", "마케팅"],
-  },
-];
+type SupportItem = {
+  id: string;
+  title: string;
+  org: string;
+  category: string;
+  region: string;
+  amount: string;
+  deadline: string;
+  status: string;
+  desc: string;
+  url: string;
+};
+
+function normalizeStatus(raw: string): string {
+  const s = raw.trim();
+  if (!s) return "접수중";
+  if (s.includes("접수") || s.includes("진행") || s.includes("OPEN")) return "접수중";
+  if (s.includes("예정") || s.includes("대기")) return "접수예정";
+  if (s.includes("마감") || s.includes("종료") || s.includes("CLOSE")) return "마감";
+  if (s.includes("상시")) return "상시";
+  return s;
+}
+
+function mapProgram(raw: Record<string, unknown>, index: number): SupportItem {
+  const title = String(raw.title ?? "").trim();
+  const org = String(raw.org ?? "").trim();
+  const apiRegion = String(raw.region ?? "").trim();
+  const region =
+    apiRegion && regions.includes(apiRegion)
+      ? apiRegion
+      : regions.find((r) => r !== "전국" && (title.includes(r) || org.includes(r))) ?? "전국";
+  const id = String(raw.id ?? `program-${index}`);
+  return {
+    id,
+    title,
+    org,
+    category: String(raw.category ?? "기타").trim() || "기타",
+    region,
+    amount: String(raw.amount ?? "미정").trim() || "미정",
+    deadline: String(raw.deadline ?? "미정").trim() || "미정",
+    status: normalizeStatus(String(raw.status ?? "")),
+    desc: String(raw.desc ?? "").trim(),
+    url:
+      String(raw.url ?? "").trim() ||
+      (id ? `https://www.bizinfo.go.kr/sii/siia/selectSIIA200Detail.do?pblancId=${encodeURIComponent(id)}` : ""),
+  };
+}
 
 export function GovernmentSupport() {
   const [selectedCategory, setSelectedCategory] = useState("전체");
   const [selectedRegion, setSelectedRegion] = useState("전국");
   const [searchQuery, setSearchQuery] = useState("");
-  const [bookmarks, setBookmarks] = useState<Set<number>>(new Set([2, 6]));
+  const [bookmarks, setBookmarks] = useState<Set<string>>(new Set());
   const [showRegionFilter, setShowRegionFilter] = useState(false);
+  const [supportData, setSupportData] = useState<SupportItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setFetchError(null);
+
+    fetch("/api/support/programs")
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return;
+        if (data.error && (!Array.isArray(data.programs) || data.programs.length === 0)) {
+          setFetchError(String(data.error));
+          setSupportData([]);
+          return;
+        }
+        const programs = Array.isArray(data.programs)
+          ? data.programs.map((p: Record<string, unknown>, i: number) => mapProgram(p, i))
+          : [];
+        setSupportData(programs);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setFetchError("지원사업 정보를 불러오지 못했습니다.");
+          setSupportData([]);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const filtered = supportData.filter((item) => {
     const matchCategory = selectedCategory === "전체" || item.category === selectedCategory;
@@ -86,7 +116,16 @@ export function GovernmentSupport() {
     return matchCategory && matchRegion && matchSearch;
   });
 
-  const toggleBookmark = (id: number) => {
+  const urgentCount = useMemo(() => {
+    const now = Date.now();
+    const weekMs = 7 * 24 * 60 * 60 * 1000;
+    return supportData.filter((item) => {
+      const parsed = Date.parse(item.deadline.replace(/\./g, "-"));
+      return !Number.isNaN(parsed) && parsed > now && parsed - now <= weekMs;
+    }).length;
+  }, [supportData]);
+
+  const toggleBookmark = (id: string) => {
     setBookmarks((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
@@ -99,6 +138,7 @@ export function GovernmentSupport() {
     switch (status) {
       case "접수중": return { background: "rgba(16,185,129,0.12)", color: "#10b981", border: "1px solid rgba(16,185,129,0.25)" };
       case "접수예정": return { background: "rgba(245,158,11,0.12)", color: "#f59e0b", border: "1px solid rgba(245,158,11,0.25)" };
+      case "마감": return { background: "rgba(239,68,68,0.12)", color: "#ef4444", border: "1px solid rgba(239,68,68,0.25)" };
       default: return { background: "rgba(59,130,246,0.12)", color: "#60a5fa", border: "1px solid rgba(59,130,246,0.25)" };
     }
   };
@@ -120,7 +160,7 @@ export function GovernmentSupport() {
           </div>
           <h1 className="text-white" style={{ fontSize: '1.55rem', fontWeight: 700, letterSpacing: '-0.02em' }}>정부 지원사업 알림</h1>
         </div>
-        <p className="text-gray-400" style={{ fontSize: '0.9rem' }}>지자체별 소상공인 지원금 · 대출 · 교육 정보를 한눈에 확인하세요</p>
+        <p className="text-gray-400" style={{ fontSize: '0.9rem' }}>기업마당(bizinfo.go.kr) 실시간 지원사업 공고</p>
       </div>
 
       {/* Quick Stats */}
@@ -128,7 +168,7 @@ export function GovernmentSupport() {
         {[
           { label: "접수 중", value: supportData.filter(s => s.status === "접수중").length + "건", bg: "rgba(16,185,129,0.1)", color: "#10b981" },
           { label: "접수 예정", value: supportData.filter(s => s.status === "접수예정").length + "건", bg: "rgba(245,158,11,0.1)", color: "#f59e0b" },
-          { label: "마감 임박", value: "2건", bg: "rgba(239,68,68,0.1)", color: "#ef4444" },
+          { label: "마감 임박", value: urgentCount + "건", bg: "rgba(239,68,68,0.1)", color: "#ef4444" },
           { label: "내 북마크", value: bookmarks.size + "건", bg: "rgba(59,130,246,0.1)", color: "#60a5fa" },
         ].map((stat) => (
           <div key={stat.label} className="rounded-xl p-4 text-center" style={{ background: stat.bg }}>
@@ -223,6 +263,16 @@ export function GovernmentSupport() {
         </p>
       </div>
 
+      {fetchError && (
+        <div
+          className="flex items-center gap-2 rounded-xl p-4 mb-4"
+          style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.2)" }}
+        >
+          <AlertCircle className="w-4 h-4 shrink-0" style={{ color: "#f59e0b" }} />
+          <p className="text-gray-400" style={{ fontSize: "0.82rem" }}>{fetchError}</p>
+        </div>
+      )}
+
       {/* Table */}
       <div className="border border-white/10 rounded-xl overflow-hidden bg-white/5">
         {/* Table Header */}
@@ -235,8 +285,23 @@ export function GovernmentSupport() {
           <div className="py-3 text-gray-400 text-center" style={{ fontSize: '0.78rem', fontWeight: 600 }}>상태</div>
         </div>
 
+        {loading && (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <Loader2 className="w-8 h-8 text-gray-500 animate-spin mb-3" />
+            <p className="text-gray-400" style={{ fontSize: "0.88rem" }}>지원사업 정보를 불러오는 중...</p>
+          </div>
+        )}
+
+        {!loading && filtered.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <Building2 className="w-12 h-12 text-gray-600 mb-4" />
+            <p className="text-gray-400" style={{ fontSize: "0.95rem", fontWeight: 600 }}>등록된 지원사업이 없습니다</p>
+            <p className="text-gray-600 mt-1" style={{ fontSize: "0.82rem" }}>API 연동 후 실제 공고가 표시됩니다</p>
+          </div>
+        )}
+
         {/* Table Rows */}
-        {filtered.map((item) => (
+        {!loading && filtered.map((item) => (
           <div
             key={item.id}
             className="grid border-b border-white/5 last:border-0 hover:bg-emerald-500/10 transition-colors group px-4 items-center"
@@ -268,7 +333,11 @@ export function GovernmentSupport() {
                 <h3 className="truncate text-gray-200 group-hover:text-primary transition-colors" style={{ fontSize: '0.92rem', fontWeight: 600 }}>
                   {item.title}
                 </h3>
-                <ExternalLink className="w-3.5 h-3.5 text-gray-600 hover:text-gray-400 cursor-pointer shrink-0 transition-colors" />
+                {item.url && (
+                  <a href={item.url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
+                    <ExternalLink className="w-3.5 h-3.5 text-gray-600 hover:text-gray-400 cursor-pointer shrink-0 transition-colors" />
+                  </a>
+                )}
               </div>
               <div className="text-gray-500 truncate mt-0.5" style={{ fontSize: '0.76rem' }}>{item.org}</div>
             </div>

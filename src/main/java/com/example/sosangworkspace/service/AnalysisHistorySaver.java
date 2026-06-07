@@ -4,6 +4,7 @@ import com.example.sosangworkspace.entity.AnalysisHistory;
 import com.example.sosangworkspace.repository.AnalysisHistoryRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +26,9 @@ public class AnalysisHistorySaver {
             boolean completed,
             Long userId
     ) {
+        if (userId == null) {
+            return null;
+        }
         AnalysisHistory history = new AnalysisHistory();
         history.setUserId(userId);
         history.setUserType(stringValue(payload.get("userType"), "NEW"));
@@ -41,6 +45,9 @@ public class AnalysisHistorySaver {
     }
 
     public Long saveNewStartupReport(Map<String, String> answers, String reportJson, Long userId) {
+        if (userId == null || reportJson == null || reportJson.isBlank()) {
+            return null;
+        }
         AnalysisHistory history = new AnalysisHistory();
         history.setUserId(userId);
         history.setUserType("NEW");
@@ -50,9 +57,24 @@ public class AnalysisHistorySaver {
         history.setOperationType(firstString(answers, "storeSize", "opType", "operationScale"));
         history.setTargetOrDistrict(firstString(answers, "areaType", "targetOrDistrict"));
         history.setPrimaryConcern(firstString(answers, "challenge", "opType", "primaryConcern"));
-        history.setLlmResultJson(reportJson != null ? reportJson : "");
-        history.setStatus(reportJson != null && !reportJson.isBlank() ? "COMPLETED" : "FAILED");
+        history.setLlmResultJson(wrapNewStartupReport(reportJson));
+        history.setStatus("COMPLETED");
         return persist(history);
+    }
+
+    private String wrapNewStartupReport(String reportJson) {
+        try {
+            Map<String, Object> body = objectMapper.readValue(
+                    reportJson,
+                    new com.fasterxml.jackson.core.type.TypeReference<LinkedHashMap<String, Object>>() {}
+            );
+            body.put("userType", "NEW");
+            body.put("type", "new_result");
+            return objectMapper.writeValueAsString(body);
+        } catch (Exception e) {
+            log.warn("[DB] 신생 보고서 래핑 실패, 원본 저장: {}", e.getMessage());
+            return reportJson;
+        }
     }
 
     private Long persist(AnalysisHistory history) {
